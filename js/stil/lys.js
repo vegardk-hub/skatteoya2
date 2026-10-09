@@ -230,3 +230,33 @@ export function tegnLysOverSkjerm(ctx, W, H, f) {
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, W, H);
 }
+
+let pool = null;
+/** Som medSkygge, men for figurer som tegnes på nytt hver gang (nærbildet): gjenbruker ett lerret og har liten, rask skygge. */
+export function figurMedLys(ctx, S, tegn) {
+  const px = Math.max(1, Math.round(S * Math.min(2, window.devicePixelRatio || 1)));
+  if (!pool || pool.width !== px) { pool = lag(px); }
+  const tc = pool.getContext('2d');
+  tc.setTransform(1, 0, 0, 1, 0, 0);
+  tc.clearRect(0, 0, px, px);
+  const f = px / S;
+  tc.setTransform(f, 0, 0, f, 0, 0);
+  if (neonPaa()) neonKontekst(tc);
+  tegn(tc);
+  tc.setTransform(1, 0, 0, 1, 0, 0);
+  tc.globalCompositeOperation = 'source-atop';
+  const g = tc.createLinearGradient(px * 0.15, px * 0.1, px * 0.85, px * 0.9);
+  g.addColorStop(0, 'rgba(255, 244, 205, 0.20)');
+  g.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+  g.addColorStop(1, 'rgba(25, 20, 70, 0.28)');
+  tc.fillStyle = g;
+  tc.fillRect(0, 0, px, px);
+  tc.globalCompositeOperation = 'source-over';
+  ctx.save();
+  ctx.shadowColor = 'rgba(14, 18, 8, 0.45)';
+  ctx.shadowBlur = S * 0.012;
+  ctx.shadowOffsetX = S * 0.028;
+  ctx.shadowOffsetY = S * 0.036;
+  ctx.drawImage(pool, 0, 0, S, S);
+  ctx.restore();
+}

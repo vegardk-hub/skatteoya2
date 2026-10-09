@@ -21,7 +21,8 @@ import { spillSeiltur } from './seiltur.js';
 import * as Museum from './museum.js';
 import { settNeon, neonPaa, neonKontekst, glod } from './stil/neon.js';
 import { visVersjon } from './versjon.js';
-import { tegnSjo, tegnLysOverSkjerm } from './stil/lys.js';
+import { tegnSjo, tegnLysOverSkjerm, figurMedLys } from './stil/lys.js';
+import * as Scene from './stil/scene.js';
 import { TAKFARGER, STANDARD_TAKFARGE, spillerfarge, settSpillerfarge } from './stil/spillerfarge.js';
 import { ikon } from './ikoner.js';
 import { sprut, flytendeTekst, tegnEffekter, harEffekter } from './effekter.js';
@@ -470,7 +471,7 @@ function seilAvsted(nr = null) {
   el.classList.remove('ferdig');
   $('seiling-tekst').textContent = liten() ? '⛵ ✨' : ny ? 'Seiler til en ny øy …' : `Seiler til ${navn} …`;
   el.hidden = false;
-  L.fanfare(3);
+  L.seil();
   // Filmen spilles over hele skjermen. Mot slutten lastes den nye øya inn bak den, og så tones filmen ut.
   let lastet = false;
   spillSeiltur($('seiling-lerret'), { fra: fraStil, til: stil }, (p) => {
@@ -517,21 +518,24 @@ function tegnNaer(tsek) {
   tegnTomtKort(ctx, S, lagTilfeldig(n.tilf), n.terreng, () => {
     const vugg = ferdigT === null ? Math.exp(-alder * 7) * Math.sin(alder * 38) * 0.07 : 0;
     const klem = ferdigT === null ? Math.exp(-alder * 16) * 0.08 : 0;
-    ctx.save();
-    ctx.translate(S * 0.5, S * 0.86);
-    ctx.rotate(vugg);
-    ctx.scale(1 + klem * 0.6, 1 - klem);
-    ctx.translate(-S * 0.5, -S * 0.86);
-    if (n.pynt) {
-      // Bygget lever: et trykk gir ekstra fart en stund (og raketten skytes opp).
-      const fest = tsek - n.tTrykk;
-      n.tv = (n.tv ?? tsek) + Math.min(0.1, tsek - (n.sist ?? tsek)) * ivrig(fest);
-      n.sist = tsek;
-      PYNT[n.pynt](ctx, S, lagTilfeldig(blandSeed(t.verden.seed, 'pynt', n.i)));
-      LIV[n.pynt]?.(ctx, S, n.tv, fest);
-    }
-    else tegnFigur(ctx, S, ting, { p, ferdigT, t: tsek });
-    ctx.restore();
+    figurMedLys(ctx, S, (c) => {
+      c.translate(S * 0.5, S * 0.86);
+      c.rotate(vugg);
+      c.scale(1 + klem * 0.6, 1 - klem);
+      c.translate(-S * 0.5, -S * 0.86);
+      if (ting && (ting.type === 'tre' || ting.type === 'korn')) Scene.vind(c, S, tsek, ting.type === 'tre' ? 1 : 1.6);
+      if (n.pynt) {
+        // Bygget lever: et trykk gir ekstra fart en stund (og raketten skytes opp).
+        const fest = tsek - n.tTrykk;
+        n.tv = (n.tv ?? tsek) + Math.min(0.1, tsek - (n.sist ?? tsek)) * ivrig(fest);
+        n.sist = tsek;
+        PYNT[n.pynt](c, S, lagTilfeldig(blandSeed(t.verden.seed, 'pynt', n.i)));
+        LIV[n.pynt]?.(c, S, n.tv, fest);
+      }
+      else tegnFigur(c, S, ting, { p, ferdigT, t: tsek });
+    });
+    if (!neonPaa() && ['eng', 'skog', 'aas'].includes(n.terreng)) Scene.gress(ctx, S, tsek);
+    Scene.ambient(ctx, S, tsek, { natt: !!t.natt, neon: neonPaa() });
   });
   ctx.restore();
   n.partikler = n.partikler.filter((q) => tsek - q.t0 < q.liv);

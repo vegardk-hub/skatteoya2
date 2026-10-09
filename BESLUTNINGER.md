@@ -9,3 +9,12 @@ Hver beslutning er tatt selvstendig, med begrunnelse.
 - **Versjon:** starter på 2.0.0 og økes ved hver publisering.
 - **Lyd: ren syntese (ingen lydfiler)**, men med ordentlige instrumentmodeller (additiv/FM/Karplus-Strong, ADSR, filter), felles miksebuss med kompressor/begrenser, og romklang laget av en prosedyrelaget impulsrespons. Begrunnelse: ingen lisensrisiko, ingen nedlasting, små filer, og vi kan måle lyden i en OfflineAudioContext.
 - **Neonøya:** beholder konseptet (øy 2), men får samme kvalitetsløft og et lettere rutenett på seilturen.
+
+## Melodikontroll (9. okt 2026)
+Alle 44 melodier ble sjekket av fire hjelpeagenter mot nettkilder (Mutopia, ABC-arkiver, Wikipedia, IMSLP). 19 ble rettet i `js/data/melodier.js`
+(bl.a. Donau, Skjebnesymfonien forkortet til åpningsmotivet, Vuggesang-pauser, Våren, Cancan, Toreador). Flettingen er gjort av `.dev/flettmelodier.py`; rådata ligger i `.dev/melodikontroll/*.json`.
+**Ukontrollert** (fant ingen lesbar notekilde): sym40, sonate, jesus, largo, brudekoret, bjornen, javielsker, morgen, sukkerfe, tell.
+Mange «ok» er vurdert ut fra kjent notebilde, ikke tone for tone mot partitur. Ingen er hørt av et menneske med øre.
+
+## Seiltur (2.0.3)
+Neon-rutenettet brukte shadowBlur på mange streker hver ramme (tungt på iPad). Erstattet med to streker (bred svak + skarp). Seilturen har egen lyd `L.seil()`.

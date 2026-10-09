@@ -10,3 +10,6 @@
 
 ## Gjenstår
 Se etappene i BESLUTNINGER.md / denne lista oppdateres fortløpende.
+- [x] 2.0.1–2.0.2: ny lydmotor (syntese), lys/skygge/tåke/hav, nærbilde-atmosfære, rikere tre
+- [x] 2.0.3: melodier kontrollert og rettet, seiltur uten shadowBlur + egen lyd
+- [ ] UI-CSS (agent), flere animasjoner, ytelsesmåling, skjermbilder alle skjermer, kilde-/lisensliste

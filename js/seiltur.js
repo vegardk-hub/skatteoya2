@@ -143,8 +143,6 @@ function hav(ctx, W, H, hy, f, neon, tid) {
     ctx.globalAlpha = neon * 0.7;
     ctx.strokeStyle = '#19e3ff';
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = '#19e3ff';
-    ctx.shadowBlur = 8;
     ctx.beginPath();
     for (let k = 1; k < 9; k++) {
       const u = ((k + tid * 0.9) % 9) / 9;
@@ -155,6 +153,12 @@ function hav(ctx, W, H, hy, f, neon, tid) {
       ctx.moveTo(W * 0.5 + k * W * 0.02, hy);
       ctx.lineTo(W * 0.5 + k * W * 0.22, H);
     }
+    // Glød uten shadowBlur (som er tung på iPad): først en bred, svak strek, så den skarpe
+    ctx.globalAlpha = neon * 0.18;
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.globalAlpha = neon * 0.7;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
   }
@@ -329,12 +333,12 @@ export function tegnSeiltur(ctx, W, H, p, tid, { fra = 'vanlig', til = 'vanlig' 
   ctx.strokeStyle = bolgeFarge;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = Math.max(1.5, bs * 0.02);
-  if (neon > 0.3) { ctx.shadowColor = bolgeFarge; ctx.shadowBlur = 6 * neon; }
   ctx.beginPath();
   for (let x = 0; x <= W; x += 12) {
     const y = vann + bs * 0.06 + Math.sin(x * 0.02 + rull * 0.03) * bs * 0.035;
     if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
+  if (neon > 0.3) { ctx.globalAlpha = 0.18 * neon; ctx.lineWidth *= 4; ctx.stroke(); ctx.lineWidth /= 4; ctx.globalAlpha = 0.55; }
   ctx.stroke();
   ctx.restore();
   for (const d of [0.5, 0.68, 0.88]) bolger(ctx, W, H, hy, bolgeFarge, neon, rull, d, 1.2);

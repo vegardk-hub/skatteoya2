@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="nb"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="../spill.css"><link rel="stylesheet" href="../ui.css">
+</head><body>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search), s = q.get('s') || 'velg';
+  const html = await (await fetch('../index.html')).text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script').forEach((e) => e.remove());
+  document.body.innerHTML = doc.body.innerHTML;
+  document.querySelectorAll('img[src^="ikon"]').forEach((i) => i.src = '../' + i.getAttribute('src'));
+  const $ = (id) => document.getElementById(id);
+  if (q.get('neon')) document.body.classList.add('neon');
+  if (q.get('liten')) document.body.classList.add('liten');
+  const lagTast = (el) => { el.innerHTML = ['1','2','3','4','5','6','7','8','9','slett','0','ok'].map((k) => `<button class="tast${k==='ok'?' tast-ok':k==='slett'?' tast-slett':''}">${k==='slett'?'⌫':k==='ok'?'✓':k}</button>`).join(''); };
+  const bygg = [['Hytte',20],['Bakeri',45],['Fyrtårn',120],['Mølle',80],['Stavkirke',200],['Slott',500]];
+  const kort = (n, p, c = '') => `<button class="byggkort ${c}"><img src="../ikon/ikon-192.png" alt=""><span class="bn">${n}</span><span class="bp">${p ? p + ' 🪙' : 'Gratis'}</span>${c.includes('dyr') ? '<span class="bm">mangler 30</span>' : ''}${c.includes('laast') ? '<span class="bl">🔒 4 av 20 ulike bygg</span>' : ''}</button>`;
+  function butikk(fane) {
+    $('butikk-mynter').innerHTML = '🪙 <b>135</b> mynter';
+    $('fane-selg').classList.toggle('valgt', fane === 'selg'); $('fane-kjop').classList.toggle('valgt', fane === 'kjop');
+    $('butikk-selg').hidden = fane !== 'selg'; $('butikk-kjop').hidden = fane !== 'kjop';
+    $('butikk-selg').innerHTML = `<button class="hoved selg-alle">💰 Selg alle skattene (240 mynter)</button><div class="selgliste">` +
+      ['💎 Rubin|3 × 40 = 120 🪙 · <span class="grad">★★ Sjelden</span>','🪵 Tre|12 × 2 = 24 🪙','🪨 Stein|5 × 3 = 15 🪙'].map((r) => { const [a, b] = r.split('|'); return `<div class="selgrad"><span class="vi">${a.split(' ')[0]}</span><span class="vn"><b>${a.split(' ')[1]}</b><small>${b}</small></span><button>Selg for 40 🪙</button></div>`; }).join('') + `</div><p class="museum-hint">🏛️ Skattene du selger, blir tatt vare på.</p>`;
+    $('butikk-kjop').innerHTML = kort('Museum', 0, 'laast') + bygg.map((b, i) => kort(b[0], b[1], i > 3 ? 'dyr' : '')).join('') + kort('⚓ Havna', 300, 'havn laast') + `<div class="butikk-overskrift">💡 Theos oppfinnelser (1 av 5)</div>` + kort('🏫 Skolen', 150, 'skole') + `<div class="byggkort hemmelig"><span class="sporsmal">💡❓</span><span class="bl">Theo tenker på noe nytt …</span></div>`;
+    $('takfarger').innerHTML = ['#d33','#e8a020','#3a8','#37c','#93c'].map((c, i) => `<button class="${i===1?'valgt':''}" style="background:${c}"></button>`).join('');
+  }
+  if (s === 'velg') {
+    $('profilliste').innerHTML = [['🦊','Theo','Dag 12 · 🌈 Øy 2'],['🐙','Mia','Dag 3'],['🦁','Pappa','Dag 40 · 🏝️ 3 øyer']].map(([a, n, i]) => `<button class="profil"><span class="ava">${a}</span><span class="navn">${n}</span><span class="info">${i}</span></button>`).join('');
+  } else {
+    $('velg').hidden = true;
+  }
+  if (['spill','butikk','meny','melding','forrad'].includes(s)) {
+    $('spill').hidden = false;
+    $('meny-knapp').textContent = '☰'; $('seil-knapp').hidden = false;
+    $('dag').textContent = 'Dag 12'; $('sol-tall').textContent = '☀️ 7';
+    const c = $('himmel'); c.width = 600; c.height = 60; const g = c.getContext('2d'); const gr = g.createLinearGradient(0,0,0,60); gr.addColorStop(0,'#5aa8e8'); gr.addColorStop(1,'#cfe8f8'); g.fillStyle = gr; g.fillRect(0,0,600,60);
+    const l = $('lerret'); l.style.background = 'linear-gradient(#3a8a9a,#3b7a3a)';
+    const v = [['🪙','187','mynter'],['🪵','12'],['🪨','5'],['💎','3'],['🌿','0']];
+    $('forrad').innerHTML = v.map(([i, n, m]) => `<span class="vare${m ? ' mynter' : ''}${n === '0' ? ' null' : ''}${i==='💎'?' dunk':''}">${i} <b>${n}</b></span>`).join('');
+  }
+  if (s === 'butikk') { butikk(q.get('fane') || 'selg'); $('butikk').showModal(); }
+  if (s === 'meny') { $('meny-tittel').textContent = 'Theo'; $('meny-nivaa').textContent = '🧒 Stor'; $('meny-lyd').textContent = '🔊 Lyd på'; $('meny').showModal(); }
+  if (s === 'ny') {
+    $('ny-avatar').innerHTML = ['🦊','🐙','🦁','🐼','🐸','🦄','🐯','🐧'].map((a, i) => `<button class="${i===0?'valgt':''}">${a}</button>`).join('');
+    $('ny-nivaa').innerHTML = ['🧒 Liten|Bare bilder','👦 Stor|Tall og tekst'].map((x, i) => { const [a, b] = x.split('|'); return `<button class="niva ${i===1?'valgt':''}"><b>${a}</b><small>${b}</small></button>`; }).join('');
+    $('ny-navn').value = 'Theo'; $('ny').showModal();
+  }
+  if (s === 'port') { $('port-tekst').textContent = 'Løs stykket for å komme inn:'; $('port-stykke').textContent = '7 + 5 ='; lagTast($('port-tast')); $('port-melding').textContent = 'Ikke helt – prøv igjen!'; $('port').showModal(); }
+  if (s === 'foreldre') {
+    $('foreldre-navn').textContent = 'Theo';
+    $('f-hurtig').innerHTML = ['Lett','Middels','Vanskelig'].map((x) => `<button>${x}</button>`).join('');
+    $('f-arter').innerHTML = ['+','−','×'].map((x) => `<div class="artrad"><button class="bryter paa">✓ ${x} Pluss</button><span class="tak">tall opp til</span><span class="valgrad liten"><button>10</button><button class="valgt">20</button></span></div>`).join('');
+    $('f-eksempel').textContent = 'Eksempel: 7 + 5';
+    $('f-svar').innerHTML = '<button class="valgt">Velg blant tre svar</button><button>Skriv svaret selv</button>';
+    $('foreldre').showModal();
+  }
+  if (s === 'sjokart') { $('sjokart-tekst').textContent = 'Hvor vil du seile?'; $('oyliste').innerHTML = '<div class="oyrad her"><span class="oyikon">🏝️</span><span class="oynavn"><b>Øy 1</b><small>Her er du</small></span><span class="her-merke">📍</span></div><button class="oyrad"><span class="oyikon">🌴</span><span class="oynavn"><b>Øy 2</b><small>12 bygg</small></span><span class="seil-merke">⛵ Seil</span></button>'; $('sjokart').showModal(); }
+  if (s === 'melding') { $('melding').hidden = false; $('melding').classList.add('vis'); $('melding').textContent = '🎁 Du fant en skattekiste! Trykk på den og løs stykket.'; }
+  if (s === 'naer') {
+    $('naer').hidden = false; $('naer').classList.add('med-matte'); $('naer-tittel').textContent = 'Skattekiste';
+    const c = $('naer-lerret'); c.width = 300; c.height = 300; c.style.background = '#46703a';
+    $('matte').hidden = false; $('matte-stykke').textContent = '7 + 5 ='; $('matte-melding').textContent = 'Riktig!'; $('matte-melding').className = 'matte-melding riktig';
+    $('matte-valg').innerHTML = '<button class="svarvalg">11</button><button class="svarvalg riktig">12</button><button class="svarvalg feil">13</button>';
+    lagTast($('matte-tast'));
+  }
+  if (s === 'plasser') { $('spill').hidden = false; $('plasser').hidden = false; $('plasser-tekst').textContent = 'Trykk der du vil sette Bakeriet'; }
+  document.title = 'ok';
+})();
+</script></body></html>

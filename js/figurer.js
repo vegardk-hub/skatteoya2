@@ -13,24 +13,52 @@ const sprett = (u) => { u = klamp(u); const c = 1.70158; return 1 + (c + 1) * Ma
 
 // --- Tre ---------------------------------------------------------------------
 function treFigur(ctx, r, x, y, h, p, bred = 1) {
-  skygge(ctx, x + h * 0.1, y, h * 0.34 * bred, h * 0.09);
-  const sb = h * 0.12;
-  poly(ctx, [[x - sb / 2, y], [x - sb * 0.38, y - h * 0.48], [x + sb * 0.38, y - h * 0.48], [x + sb / 2, y]], '#8a5c38');
-  poly(ctx, [[x + sb * 0.05, y], [x + sb * 0.05, y - h * 0.48], [x + sb * 0.38, y - h * 0.48], [x + sb / 2, y]], '#6a4428');
+  skygge(ctx, x + h * 0.12, y + h * 0.005, h * 0.38 * bred, h * 0.075, 0.26);
+  const sb = h * 0.13;
+  // røtter som bretter seg ut i bunnen
+  for (const [dx, dir] of [[-1, -1], [1, 1], [0.15, 1]]) {
+    poly(ctx, [[x + dx * sb * 0.2, y - h * 0.06], [x + dir * sb * 0.95, y + h * 0.005], [x + dir * sb * 0.3, y + h * 0.005]], dir < 0 ? '#7d5232' : '#5f3d22');
+  }
+  // stammen i to flater, med årer i barken og en grein som gaffler ut
+  poly(ctx, [[x - sb / 2, y], [x - sb * 0.36, y - h * 0.5], [x + sb * 0.36, y - h * 0.5], [x + sb / 2, y]], '#8f6139');
+  poly(ctx, [[x + sb * 0.08, y], [x + sb * 0.08, y - h * 0.5], [x + sb * 0.36, y - h * 0.5], [x + sb / 2, y]], '#66411f');
+  poly(ctx, [[x - sb * 0.1, y - h * 0.4], [x - sb * 0.7, y - h * 0.62], [x - sb * 0.45, y - h * 0.64], [x + sb * 0.02, y - h * 0.46]], '#7d5232');
+  poly(ctx, [[x + sb * 0.1, y - h * 0.42], [x + sb * 0.75, y - h * 0.66], [x + sb * 0.5, y - h * 0.68], [x + sb * 0.0, y - h * 0.48]], '#6e4527');
+  ctx.strokeStyle = 'rgba(50, 28, 12, 0.35)';
+  ctx.lineWidth = Math.max(1, sb * 0.06);
+  for (let i = 0; i < 4; i++) {
+    const bx = x + (i - 1.5) * sb * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(bx, y - h * 0.04);
+    ctx.lineTo(bx + sb * 0.03, y - h * (0.18 + i * 0.07));
+    ctx.stroke();
+  }
   if (p > 0) {
     // Hakket i stammen blir dypere for hvert hogg.
     const d = sb * 0.95 * p;
     poly(ctx, [[x - sb / 2 - 0.5, y - h * 0.1], [x - sb / 2 + d, y - h * 0.15], [x - sb / 2 - 0.5, y - h * 0.21]], '#ecc98e');
   }
-  const kl = bred > 1.1
-    ? [[-0.24, -0.58, 0.24], [0.24, -0.6, 0.24], [-0.1, -0.78, 0.25], [0.14, -0.82, 0.22], [0, -0.64, 0.26]]
-    : [[-0.15, -0.6, 0.25], [0.15, -0.63, 0.24], [0, -0.8, 0.27]];
-  const farger = [mork(FIGUR.lov, 0.1), FIGUR.lov, lys(FIGUR.lov, 0.08), lys(FIGUR.lov, 0.12), FIGUR.lov];
-  kl.forEach(([dx, dy, rr], i) => fasett(ctx, klump(r, x + dx * h * bred, y + dy * h, rr * h * bred, rr * h * 0.88, 8, 0.12), farger[i]));
-  for (const [dx, dy] of [[-0.14, -0.62], [0.12, -0.72], [0.02, -0.86], [0.2, -0.56]]) {
-    ctx.fillStyle = '#d0453f';
+  // Krona: bakerste lag mørkt, så midten, så de lyse klumpene øverst til venstre (lyset kommer derfra)
+  const lag = bred > 1.1
+    ? [[-0.26, -0.6, 0.23, 0], [0.27, -0.62, 0.23, 0], [0, -0.7, 0.28, 0], [-0.17, -0.78, 0.22, 1], [0.17, -0.8, 0.22, 1], [-0.3, -0.7, 0.2, 1], [0.3, -0.72, 0.18, 1], [0, -0.9, 0.22, 2], [-0.14, -0.88, 0.17, 2], [0.12, -0.62, 0.2, 1]]
+    : [[-0.17, -0.62, 0.23, 0], [0.18, -0.64, 0.22, 0], [0, -0.74, 0.26, 1], [-0.1, -0.82, 0.2, 2], [0.12, -0.8, 0.19, 1]];
+  const base = [mork(FIGUR.lov, 0.22), FIGUR.lov, lys(FIGUR.lov, 0.14)];
+  lag.forEach(([dx, dy, rr, niva], i) => {
+    const kx = x + dx * h * bred, ky = y + dy * h, kr = rr * h * bred;
+    skygge(ctx, kx + kr * 0.12, ky + kr * 0.2, kr * 0.9, kr * 0.5, 0.0);
+    fasett(ctx, klump(r, kx, ky, kr, kr * 0.9, 9, 0.14), base[niva]);
+    // lyst blad-glimt øverst
+    if (niva === 2) fasett(ctx, klump(r, kx - kr * 0.25, ky - kr * 0.3, kr * 0.45, kr * 0.35, 6, 0.2), lys(FIGUR.lov, 0.3), { styrke: 0.6 });
+  });
+  for (const [dx, dy] of [[-0.16, -0.64], [0.14, -0.74], [0.02, -0.88], [0.24, -0.58], [-0.24, -0.78], [0.06, -0.7]]) {
+    const ax = x + h * dx * bred, ay = y + h * dy;
+    ctx.fillStyle = '#b8302f';
     ctx.beginPath();
-    ctx.arc(x + h * dx * bred, y + h * dy, h * 0.028, 0, Math.PI * 2);
+    ctx.arc(ax, ay, h * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.beginPath();
+    ctx.arc(ax - h * 0.01, ay - h * 0.012, h * 0.009, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -50,7 +78,7 @@ function stubbe(ctx, x, y, r) {
 }
 
 function figurTre(ctx, S, r, k, p, ferdigT) {
-  const x = S * 0.5, y = S * 0.88, h = S * [0.5, 0.68, 0.86][k.str], bred = [0.8, 1, 1.25][k.str];
+  const x = S * 0.5, y = S * 0.88, h = S * [0.58, 0.76, 0.94][k.str], bred = [0.85, 1, 1.2][k.str];
   if (ferdigT === null) { treFigur(ctx, r, x, y, h, p, bred); return; }
   // Treet faller mot høyre, blir liggende litt og blekner; stubben står igjen.
   stubbe(ctx, x, y, S * [0.04, 0.06, 0.08][k.str]);

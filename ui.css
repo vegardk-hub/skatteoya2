@@ -1,0 +1,500 @@
+/* Skatteøya II – grensesnittlaget («eventyrkart og skattekiste»).
+   Lastes etter spill.css og overstyrer utseendet. Ingen id-er eller klasser er nye;
+   alt hviler på de eksisterende. Neonøya skifter utseende ved å bytte variablene lenger ned. */
+
+:root {
+  /* Eksisterende (spill.css) – holdes samlet her for oversikt */
+  --panel: #f6f1e4; --kant: #c9bfa6; --tekst: #2b2a26; --krem: #faf2db; --dempet: #cfc6ad;
+  --gull: #ffd23f; --gullkant: #d9a520;
+  /* Pergament */
+  --perg-lys: #fffaf0; --perg-mork: #eadfc3; --tittel: #5b3a17; --svak: #5b5240;
+  --felt: #fffdf6; --felt-kant: #dccfae; --felt-bunn: #efe4c8;
+  /* Tre og messing */
+  --tre-lys: #9a6531; --tre: #7a4a22; --tre-mork: #4a2a12; --messing: #d9a520; --messing-lys: #ffe58a; --messing-mork: #8a5a1c;
+  --topp-bg: linear-gradient(180deg, #9a6531 0%, #7a4a22 55%, #5e3818 100%);
+  --kornet: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 11px);
+  --spor: linear-gradient(180deg, #3b2210, #55331a);
+  /* Knapper */
+  --knapp-lys: #ffffff; --knapp: #fbf4e2; --knapp-mork: #eadcb8; --knapp-kant: #c9b98f; --knapp-skygge: #b3a273;
+  --knapp-glans: rgba(255, 255, 255, 0.95); --knapp-fall: rgba(60, 35, 10, 0.28);
+  --gronn-lys: #3da764; --gronn: #2a8f52; --gronn-mork: #1b6e3c; --gronn-kant: #14502b;
+  --gull-lys: #fff0b0; --gull-mid: #ffd95a; --gull-mork: #f2b830;
+  /* Tilstander */
+  --riktig: #1e8a4c; --feil: #b3261e;
+  --fjeder: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+body.neon {
+  --perg-lys: #22113d; --perg-mork: #150a2a; --tittel: #ffd6f6; --svak: #b9a6d6;
+  --felt: #22113d; --felt-kant: #4a2a82; --felt-bunn: #1a0c33;
+  --topp-bg: linear-gradient(180deg, #2a1250 0%, #1a0b36 100%); --kornet: none;
+  --spor: linear-gradient(180deg, #0d0620, #1b0d38);
+  --knapp-lys: #3a1d66; --knapp: #2b1650; --knapp-mork: #1d0e3a; --knapp-kant: #6c3bd1; --knapp-skygge: #12082a;
+  --knapp-glans: rgba(255, 255, 255, 0.18); --knapp-fall: rgba(0, 0, 0, 0.55);
+  --messing: #19e3ff; --messing-mork: #0b7fa0; --tre: #6c3bd1; --tre-mork: #2a1250;
+}
+
+/* ================= Knapper ================= */
+button {
+  font-size: 18px; font-weight: 700; min-height: 52px; padding: 8px 18px; border-radius: 16px; line-height: 1.2;
+  border: 2px solid var(--knapp-kant); color: var(--tekst);
+  background: linear-gradient(180deg, var(--knapp-lys) 0%, var(--knapp) 50%, var(--knapp-mork) 100%);
+  box-shadow: inset 0 2px 0 var(--knapp-glans), inset 0 -3px 0 rgba(0, 0, 0, 0.07), 0 4px 0 var(--knapp-skygge), 0 8px 12px var(--knapp-fall);
+  transition: transform 0.18s var(--fjeder), box-shadow 0.18s var(--fjeder), filter 0.15s;
+  position: relative;
+}
+button:active {
+  transform: translateY(3px); filter: brightness(0.97);
+  box-shadow: inset 0 2px 0 var(--knapp-glans), inset 0 -2px 0 rgba(0, 0, 0, 0.07), 0 1px 0 var(--knapp-skygge), 0 2px 4px var(--knapp-fall);
+  transition-duration: 0.06s;
+}
+button:disabled { opacity: 0.5; }
+button:focus-visible, input:focus-visible { outline: 4px solid rgba(25, 140, 255, 0.55); outline-offset: 2px; }
+@media (hover: hover) {
+  button:hover { filter: brightness(1.04); }
+  button:active { filter: brightness(0.97); }
+}
+
+/* Primær: grønn */
+button.hoved {
+  background: linear-gradient(180deg, var(--gronn-lys) 0%, var(--gronn) 55%, var(--gronn-mork) 100%);
+  border-color: var(--gronn-kant); color: #fff; font-size: 19px; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 40, 15, 0.55);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.15), 0 4px 0 var(--gronn-kant), 0 8px 12px var(--knapp-fall);
+}
+button.hoved:active {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 0 rgba(0, 0, 0, 0.15), 0 1px 0 var(--gronn-kant), 0 2px 4px var(--knapp-fall);
+}
+/* Primær: gull (store knapper og «selg alt») */
+.stor-knapp, .selg-alle {
+  background: linear-gradient(180deg, var(--gull-lys) 0%, var(--gull-mid) 55%, var(--gull-mork) 100%);
+  border-color: var(--messing-mork); color: #3a2600; font-weight: 800;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), inset 0 -3px 0 rgba(120, 70, 0, 0.18), 0 4px 0 var(--messing-mork), 0 8px 12px var(--knapp-fall);
+}
+.stor-knapp:active, .selg-alle:active {
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), inset 0 -2px 0 rgba(120, 70, 0, 0.18), 0 1px 0 var(--messing-mork), 0 2px 4px var(--knapp-fall);
+}
+.stor-knapp { font-size: 22px; min-height: 64px; padding: 10px 30px; border-radius: 20px; }
+#morgen:active { transform: translateX(-50%) translateY(3px); }
+
+/* Rund-knapper: messingmynter */
+button.rund {
+  width: 56px; height: 56px; font-size: 28px; border-width: 3px; border-color: var(--messing-mork); color: #3a2600;
+  background: radial-gradient(circle at 35% 25%, #fffbe8 0%, #f6dc92 45%, #d9a83c 100%);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.9), inset 0 -4px 5px rgba(120, 70, 0, 0.3), 0 4px 0 var(--messing-mork), 0 8px 12px var(--knapp-fall);
+}
+button.rund:active {
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.9), inset 0 -3px 4px rgba(120, 70, 0, 0.3), 0 1px 0 var(--messing-mork), 0 2px 4px var(--knapp-fall);
+}
+button.rund.lukk { background: radial-gradient(circle at 35% 25%, #fff0ea 0%, #f1a595 50%, #c8503c 100%); border-color: #7d2418; color: #5a1208; box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.8), inset 0 -4px 5px rgba(90, 20, 10, 0.3), 0 4px 0 #7d2418, 0 8px 12px var(--knapp-fall); font-size: 24px; }
+#natt-knapp.av { background: radial-gradient(circle at 35% 25%, #ffffff, #ffe58a 55%, #f2b830); box-shadow: 0 0 0 4px rgba(255, 210, 63, 0.55), inset 0 2px 2px #fff, 0 4px 0 var(--messing-mork), 0 8px 12px var(--knapp-fall); }
+body.neon button.rund { background: radial-gradient(circle at 35% 25%, #4a2a82, #22113d); border-color: #19e3ff; box-shadow: 0 0 10px rgba(25, 227, 255, 0.5), 0 4px 0 #0b3a50; color: #fff; }
+body.neon button.rund.lukk { background: radial-gradient(circle at 35% 25%, #8a2a4a, #3a0f1c); border-color: #ff5c8a; }
+body.neon #natt-knapp.av { background: radial-gradient(circle at 35% 25%, #6a4400, #3a2400); }
+
+/* ================= Typografi ================= */
+body { font-size: 18px; }
+dialog h2 {
+  margin: 0 0 14px; font-size: 30px; line-height: 1.15; font-weight: 900; color: var(--tittel); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+body.neon dialog h2 { text-shadow: 0 0 10px rgba(255, 43, 214, 0.6); }
+dialog h2::after {
+  content: ""; display: block; width: 72px; height: 5px; margin: 10px auto 0; border-radius: 5px;
+  background: linear-gradient(90deg, transparent, var(--messing) 20%, var(--messing-lys) 50%, var(--messing) 80%, transparent);
+}
+.etikett { margin: 18px 0 8px; font-size: 18px; font-weight: 800; color: var(--tittel); }
+.forklaring, .eksempel, .tom-tekst, #sjokart-tekst, .museum-hint { color: var(--svak); }
+.forklaring, .tom-tekst { font-size: 18px; }
+.museum-hint { font-size: 16px; }
+
+/* ================= Dialoger ================= */
+dialog.kort {
+  font-size: 18px; max-height: 92vh; max-height: 92dvh; padding: 22px 24px; border: 6px solid var(--tre); border-radius: 28px;
+  background: linear-gradient(180deg, var(--perg-lys) 0%, var(--panel) 35%, var(--perg-mork) 100%);
+  box-shadow:
+    inset 0 0 0 2px var(--messing), inset 0 4px 0 rgba(255, 255, 255, 0.7), inset 0 -6px 18px rgba(120, 80, 30, 0.18),
+    0 2px 0 var(--tre-lys), 0 6px 0 var(--tre-mork), 0 24px 50px rgba(0, 0, 0, 0.55);
+}
+body.neon dialog.kort { box-shadow: inset 0 0 0 2px #19e3ff, 0 0 30px rgba(176, 44, 255, 0.55), 0 6px 0 #12082a; }
+dialog.kort[open] { animation: dialog-inn 0.28s var(--fjeder); }
+dialog.kort[open]::backdrop { animation: bakgrunn-inn 0.28s ease-out; }
+dialog.kort::backdrop {
+  background: radial-gradient(ellipse at 50% 40%, rgba(20, 30, 55, 0.55), rgba(3, 5, 12, 0.82));
+  -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+}
+@keyframes dialog-inn { from { opacity: 0; transform: scale(0.8) translateY(28px); } to { opacity: 1; transform: none; } }
+@keyframes bakgrunn-inn { from { opacity: 0; } }
+/* Myk lukking der nettleseren kan (Chrome, nyere Safari); ellers lukker den bare. */
+@supports (transition-behavior: allow-discrete) {
+  dialog.kort { transition: opacity 0.2s ease-in, transform 0.2s ease-in, overlay 0.2s allow-discrete, display 0.2s allow-discrete; }
+  dialog.kort:not([open]) { opacity: 0; transform: scale(0.9) translateY(14px); }
+  dialog.kort::backdrop { transition: opacity 0.2s, overlay 0.2s allow-discrete, display 0.2s allow-discrete; }
+  dialog.kort:not([open])::backdrop { opacity: 0; }
+}
+dialog.kort::after { color: var(--svak); }
+
+.navnefelt { font-size: 18px; color: var(--tittel); }
+.navnefelt input {
+  font-size: 22px; font-weight: 700; padding: 12px 14px; min-height: 56px; border-radius: 14px; color: var(--tekst);
+  border: 3px solid var(--felt-kant); background: var(--felt); box-shadow: inset 0 3px 6px rgba(90, 60, 20, 0.2);
+}
+.navnefelt input:focus { border-color: var(--messing); }
+.valgrad { gap: 10px; }
+.avatarer button { width: 60px; height: 60px; min-height: 0; font-size: 32px; border-radius: 16px; padding: 0; }
+.valgrad button.valgt, .faner button.valgt, .emner button.valgt {
+  background: linear-gradient(180deg, var(--gull-lys), var(--gull-mid) 60%, var(--gull-mork)); border-color: var(--messing-mork); color: #3a2600;
+  box-shadow: 0 0 0 4px rgba(217, 165, 32, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 4px 0 var(--messing-mork), 0 8px 12px var(--knapp-fall);
+}
+.valgrad .niva { padding: 12px 10px; min-width: 120px; }
+.valgrad .niva small { font-size: 15px; color: var(--svak); }
+.valgrad button.valgt small { color: #5a4300; }
+.knapper { gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+.knapper button { flex: 1 1 140px; }
+.menyknapper { gap: 12px; }
+.menyknapper button { min-height: 58px; font-size: 20px; }
+.full { margin-top: 14px; }
+.laerer-knapper { justify-content: center; }
+
+/* ================= Velg spiller ================= */
+.velg {
+  position: relative; isolation: isolate; gap: 18px; padding: max(36px, env(safe-area-inset-top)) 16px max(36px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(ellipse 70% 38% at 50% 16%, rgba(255, 205, 120, 0.6), transparent 70%),
+    radial-gradient(ellipse 120% 40% at 50% 100%, rgba(240, 200, 130, 0.5), transparent 70%),
+    linear-gradient(180deg, #12305c 0%, #1b5a88 50%, #247f99 82%, #2f9aa5 100%);
+}
+#velg > * { position: relative; z-index: 1; }
+/* Glitter og bølger: ligger bak innholdet og tar ikke imot trykk. */
+#velg::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; animation: glitter 4s ease-in-out infinite alternate;
+  background:
+    radial-gradient(2px 2px at 8% 12%, #fff, transparent), radial-gradient(3px 3px at 22% 30%, #ffeab0, transparent),
+    radial-gradient(2px 2px at 36% 8%, #fff, transparent), radial-gradient(2px 2px at 52% 22%, #fff, transparent),
+    radial-gradient(3px 3px at 68% 10%, #ffeab0, transparent), radial-gradient(2px 2px at 82% 26%, #fff, transparent),
+    radial-gradient(2px 2px at 92% 8%, #fff, transparent), radial-gradient(3px 3px at 14% 52%, #cfe9ff, transparent),
+    radial-gradient(2px 2px at 88% 48%, #cfe9ff, transparent), radial-gradient(2px 2px at 60% 40%, #fff, transparent);
+}
+#velg::after {
+  content: ""; position: fixed; left: 0; bottom: 0; width: calc(100% + 120px); height: 64px; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.2) 0 34px, transparent 35px) 0 0 / 120px 64px repeat-x;
+  animation: boelger 9s linear infinite;
+}
+@keyframes glitter { from { opacity: 0.35; } to { opacity: 1; } }
+@keyframes boelger { to { transform: translateX(-120px); } }
+.velg h1 {
+  font-size: 40px; font-weight: 900; color: #ffe9b0; letter-spacing: 0.5px;
+  text-shadow: 0 3px 0 #7a4a22, 0 6px 0 rgba(60, 30, 10, 0.55), 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+.velg .logo {
+  width: 136px; height: 136px; border-radius: 30px; margin-bottom: 0; border: 4px solid var(--messing); animation: svev 3.6s ease-in-out infinite;
+  box-shadow: 0 0 0 4px var(--tre), 0 12px 40px rgba(255, 190, 80, 0.4), 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+@keyframes svev { 50% { transform: translateY(-9px) rotate(1.5deg); } }
+.velg .under { font-size: 24px; font-weight: 800; color: var(--krem); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.velg .tom { font-size: 20px; color: var(--krem); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.profilliste { gap: 16px; }
+.profil {
+  width: 168px; min-height: 170px; gap: 6px; padding: 16px 8px 14px; border-radius: 24px; border: 4px solid var(--tre); color: var(--tekst);
+  background: linear-gradient(180deg, var(--perg-lys) 0%, var(--panel) 45%, var(--perg-mork) 100%);
+  box-shadow: inset 0 0 0 2px var(--messing), inset 0 3px 0 rgba(255, 255, 255, 0.8), 0 6px 0 var(--tre-mork), 0 14px 22px rgba(0, 0, 0, 0.4);
+}
+.profil:active { box-shadow: inset 0 0 0 2px var(--messing), inset 0 3px 0 rgba(255, 255, 255, 0.8), 0 2px 0 var(--tre-mork), 0 4px 8px rgba(0, 0, 0, 0.4); transform: translateY(4px) scale(0.98); }
+@media (hover: hover) { .profil:hover { transform: translateY(-4px); } .profil:hover:active { transform: translateY(4px) scale(0.98); } }
+.profil .ava {
+  width: 84px; height: 84px; display: grid; place-items: center; font-size: 50px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #fffbe8, #f6dc92 60%, #e6bb55); border: 3px solid var(--messing-mork);
+  box-shadow: inset 0 -4px 6px rgba(120, 70, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.25);
+}
+.profil .navn { font-size: 22px; font-weight: 900; color: var(--tittel); }
+.profil .info { font-size: 16px; font-weight: 600; color: var(--svak); }
+.smaa { font-size: 17px; margin: 0; color: var(--krem); }
+.smaa a { color: #ffe9b0; font-weight: 700; display: inline-block; padding: 10px 6px; }
+.foreldre-knapp {
+  background: linear-gradient(180deg, #3b4658, #1f2735); color: var(--krem); border-color: #4a5870; font-size: 17px; margin-top: 0;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), 0 4px 0 #0f141d, 0 8px 12px rgba(0, 0, 0, 0.35);
+}
+.foreldre-knapp:active { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), 0 1px 0 #0f141d; }
+
+/* ================= Topplinja ================= */
+.topp {
+  position: relative; z-index: 3; gap: 12px; padding: 10px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--kornet), var(--topp-bg); border-bottom: 5px solid var(--tre-mork);
+  box-shadow: inset 0 3px 0 rgba(255, 225, 170, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.2), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+body.neon .topp { border-bottom-color: #19e3ff; box-shadow: 0 0 16px rgba(25, 227, 255, 0.45); }
+.himmel {
+  height: 60px; border-radius: 16px; border: 4px solid var(--messing); background: #9cd0f0;
+  box-shadow: 0 0 0 2px var(--messing-mork), inset 0 4px 10px rgba(0, 0, 0, 0.4), 0 2px 0 rgba(255, 235, 190, 0.5);
+}
+.himmel::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 50%);
+}
+#dag, #sol-tall {
+  z-index: 1; padding: 2px 14px; border-radius: 999px; font-size: 21px; font-weight: 900; color: #2a1d0a; text-shadow: none;
+  background: rgba(255, 248, 225, 0.88); border: 2px solid rgba(138, 90, 28, 0.65); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); font-variant-numeric: tabular-nums;
+}
+#dag:empty, #sol-tall:empty { display: none; }
+#dag { left: 10px; } #sol-tall { right: 10px; }
+body.neon #dag, body.neon #sol-tall { background: rgba(21, 10, 42, 0.8); color: #fff; border-color: #ff2bd6; text-shadow: 0 0 6px #ff2bd6; }
+
+/* ================= Forrådet ================= */
+.forrad {
+  gap: 8px; padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  background: var(--kornet), var(--topp-bg); border-top: 5px solid var(--tre-mork);
+  box-shadow: inset 0 3px 0 rgba(255, 225, 170, 0.35), 0 -6px 14px rgba(0, 0, 0, 0.35); position: relative; z-index: 3;
+}
+body.neon .forrad { border-top-color: #19e3ff; }
+.vare {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 66px; min-height: 46px; padding: 4px 8px 4px 10px;
+  border-radius: 14px; font-size: 22px; color: var(--krem); border: 2px solid var(--tre-mork); background: var(--spor);
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 rgba(255, 225, 170, 0.4);
+}
+.vare b {
+  min-width: 1.7em; padding: 0 8px; border-radius: 999px; font-size: 18px; font-weight: 900; line-height: 1.5; text-align: center;
+  background: linear-gradient(180deg, #fffaf0, #eadfc3); color: #2b2a26; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+.vare.mynter { background: linear-gradient(180deg, #4d3300, #6b4700); border-color: var(--messing-mork); }
+.vare.mynter b { background: linear-gradient(180deg, #fff0b0, #ffd23f); color: #3a2600; }
+.vare.null { opacity: 0.45; }
+body.neon .vare, body.neon .vare.mynter { color: #f6eaff; border-color: #6c3bd1; }
+body.neon .vare.mynter { border-color: #ffd23f; }
+body.liten .vare { font-size: 24px; letter-spacing: -7px; padding-right: 18px; }
+body.liten .vare.null { letter-spacing: 0; padding-right: 10px; }
+.dunk { animation: dunk 0.5s var(--fjeder); }
+@keyframes dunk {
+  0% { box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(255, 210, 63, 0.9); }
+  35% { transform: scale(1.3); box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6), 0 0 18px 6px rgba(255, 210, 63, 0.85); }
+  100% { box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6), 0 0 0 0 rgba(255, 210, 63, 0); }
+}
+@media (max-width: 560px) {
+  .vare { min-width: 0; min-height: 42px; font-size: 18px; padding: 3px 6px 3px 8px; gap: 4px; }
+  .vare b { font-size: 16px; padding: 0 6px; }
+  .forrad { gap: 6px; }
+  .velg h1 { font-size: 32px; }
+  .profil { width: 150px; }
+  dialog.kort { padding: 18px 16px; border-width: 5px; }
+  dialog h2 { font-size: 28px; }
+  .topp { gap: 8px; }
+  button.rund { width: 52px; height: 52px; }
+}
+
+/* ================= Meldinger ================= */
+.melding {
+  bottom: calc(104px + env(safe-area-inset-bottom)); max-width: min(92vw, 620px); padding: 14px 24px; font-size: 21px; font-weight: 800; line-height: 1.3;
+  border: 5px solid var(--tre); border-radius: 22px;
+  background: linear-gradient(180deg, var(--perg-lys), var(--perg-mork));
+  box-shadow: inset 0 0 0 2px var(--messing), inset 0 3px 0 rgba(255, 255, 255, 0.8), 0 5px 0 var(--tre-mork), 0 16px 26px rgba(0, 0, 0, 0.45);
+}
+body.liten .melding { font-size: 36px; padding: 8px 22px; }
+.melding.vis { animation: melding-inn 0.45s var(--fjeder); }
+@keyframes melding-inn { from { opacity: 0; transform: translateX(-50%) translateY(36px) scale(0.7); } to { opacity: 1; transform: translateX(-50%); } }
+body.neon .melding { box-shadow: inset 0 0 0 2px #ff2bd6, 0 0 18px rgba(255, 43, 214, 0.6), 0 5px 0 #12082a; }
+
+.plasser {
+  top: calc(env(safe-area-inset-top) + 96px); padding: 8px 10px 8px 18px; font-size: 20px; font-weight: 800; border: 5px solid var(--tre); border-radius: 22px;
+  background: linear-gradient(180deg, var(--perg-lys), var(--perg-mork));
+  box-shadow: inset 0 0 0 2px var(--messing), 0 5px 0 var(--tre-mork), 0 14px 24px rgba(0, 0, 0, 0.45); animation: plasser-inn 0.4s var(--fjeder);
+}
+@keyframes plasser-inn { from { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(0.8); } }
+
+/* ================= Nærbilde og matte ================= */
+.naer { background: radial-gradient(ellipse at 50% 45%, rgba(20, 28, 50, 0.7), rgba(3, 5, 12, 0.88)); }
+.naer-tittel { font-size: 28px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); }
+.naer-tittel .sang { font-size: 20px; }
+.naer .lukk { top: -10px; right: -10px; }
+.matte {
+  padding: 16px 16px 18px; gap: 10px; border: 5px solid var(--tre); border-radius: 24px;
+  background: linear-gradient(180deg, var(--perg-lys), var(--panel) 40%, var(--perg-mork));
+  box-shadow: inset 0 0 0 2px var(--messing), inset 0 3px 0 rgba(255, 255, 255, 0.8), 0 5px 0 var(--tre-mork), 0 16px 28px rgba(0, 0, 0, 0.5);
+}
+.matte-stykke { font-size: 44px; line-height: 1.1; }
+.matte-svar {
+  min-width: 1.7em; border: 3px dashed var(--messing-mork); background: var(--felt-bunn); color: var(--tekst); box-shadow: inset 0 4px 8px rgba(90, 60, 20, 0.3);
+}
+.matte-melding { min-height: 32px; font-size: 22px; }
+.matte-melding.feil { color: var(--feil); }
+.matte-melding.riktig { color: var(--riktig); }
+.matte-valg { gap: 12px; }
+.svarvalg { min-width: 92px; min-height: 80px; font-size: 38px; border-radius: 20px; border-width: 3px; }
+.svarvalg.feil { background: linear-gradient(180deg, #ffe6e1, #ffc3ba); border-color: var(--feil); opacity: 0.65; }
+.svarvalg.riktig { background: linear-gradient(180deg, #d9f8e2, #a6e8bd); border-color: var(--riktig); animation: riktig-pop 0.45s var(--fjeder); }
+@keyframes riktig-pop { 40% { transform: scale(1.18); } }
+
+.tastatur { grid-template-columns: repeat(3, 80px); gap: 10px; }
+.tast {
+  min-height: 64px; font-size: 30px; font-weight: 900; border-radius: 18px; border-width: 3px;
+  background: linear-gradient(180deg, #ffffff, #f5ead0 55%, #e7d6a8);
+}
+.tast:active { transform: translateY(3px) scale(0.96); }
+.tast-slett { color: #8a2a20; background: linear-gradient(180deg, #fff3f0, #ffd9d2 55%, #f3b8ae); border-color: #d99; }
+.tast-ok { background: linear-gradient(180deg, #d9f8e2, #8fdcaa); border-color: var(--riktig); color: #14502b; }
+body.neon .tast { background: #2b1650; color: #f6eaff; }
+body.neon .tast-slett { background: #3a0f1c; color: #ff9fb6; }
+body.neon .tast-ok { background: #0f4a2c; color: #9dffc9; }
+@media (max-height: 760px) and (orientation: portrait) {
+  .tast { min-height: 54px; font-size: 26px; }
+  .matte-stykke { font-size: 36px; }
+  .tastatur { grid-template-columns: repeat(3, 76px); gap: 8px; }
+}
+.havn-valg {
+  padding: 14px 18px; gap: 10px; border: 5px solid var(--tre); border-radius: 22px;
+  background: linear-gradient(180deg, var(--perg-lys), var(--perg-mork));
+  box-shadow: inset 0 0 0 2px var(--messing), 0 5px 0 var(--tre-mork), 0 14px 24px rgba(0, 0, 0, 0.45);
+}
+.havn-valg p { font-size: 20px; font-weight: 700; }
+.havn-valg small { color: var(--feil); font-size: 16px; }
+
+/* ================= Butikken ================= */
+dialog.kort.bred { max-height: 92vh; max-height: 92dvh; }
+.faner { gap: 6px; margin: 0 0 12px; align-items: flex-end; border-bottom: 5px solid var(--tre); padding: 0 6px; }
+.faner button {
+  min-height: 58px; font-size: 20px; font-weight: 800; border-width: 3px 3px 0; border-radius: 18px 18px 0 0; margin-bottom: -5px;
+  background: linear-gradient(180deg, #d8c9a0, #bfae7e); color: #4a3a1a; border-color: var(--tre);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -6px 8px rgba(0, 0, 0, 0.12);
+}
+.faner button:active { transform: translateY(2px); }
+.faner button.valgt {
+  min-height: 66px; margin-bottom: -5px; z-index: 1; color: #3a2600; border-color: var(--tre);
+  background: linear-gradient(180deg, var(--gull-lys), var(--gull-mid) 70%, var(--gull-mork));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.8);
+}
+body.neon .faner button { background: #1d0e3a; color: #cdb8f0; border-color: #6c3bd1; }
+body.neon .faner button.valgt { background: #ff2bd6; color: #fff; border-color: #ff9cf0; }
+.mynter-linje {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 8px; margin: 4px 0 12px; padding: 8px 18px;
+  font-size: 22px; font-weight: 700; color: var(--krem); border: 3px solid var(--messing-mork); border-radius: 20px;
+  background: var(--kornet), linear-gradient(180deg, #8a5a2b, #5e3818);
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.45), inset 0 -2px 0 rgba(255, 225, 170, 0.2), 0 3px 0 var(--tre-mork), 0 6px 10px rgba(0, 0, 0, 0.25);
+}
+.mynter-linje b { font-size: 30px; font-weight: 900; color: var(--gull); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); font-variant-numeric: tabular-nums; }
+.mynter-linje .kreativ-merke { color: #e8d4ff; font-size: 16px; }
+.butikk-innhold { max-height: min(54vh, max(160px, calc(92dvh - 430px))); padding: 4px 4px 8px; -webkit-overflow-scrolling: touch; }
+.selg-alle { font-size: 21px; min-height: 60px; margin-bottom: 12px; }
+.selgliste { gap: 10px; }
+.selgrad {
+  gap: 12px; padding: 8px 12px; border-radius: 18px; background: linear-gradient(180deg, var(--felt), var(--felt-bunn)); border: 2px solid var(--felt-kant);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 3px 0 var(--felt-kant);
+}
+.selgrad .vi {
+  width: 52px; height: 52px; display: grid; place-items: center; font-size: 34px; flex: none; border-radius: 50%;
+  background: var(--felt-bunn); box-shadow: inset 0 3px 6px rgba(90, 60, 20, 0.3);
+}
+.selgrad .vn b { font-size: 19px; }
+.selgrad .vn small { font-size: 16px; color: var(--svak); }
+.selgrad button {
+  min-width: 130px; font-weight: 800; color: #3a2600; border-color: var(--messing-mork);
+  background: linear-gradient(180deg, var(--gull-lys), var(--gull-mid) 55%, var(--gull-mork));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 4px 0 var(--messing-mork), 0 6px 10px var(--knapp-fall);
+}
+.selgrad button:active { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 1px 0 var(--messing-mork); }
+.selgrad .grad { color: #8a5a00; }
+body.neon .selgrad .grad { color: #ffd23f; }
+body.neon .selgrad button { background: #ff2bd6; color: #fff; border-color: #ff9cf0; }
+
+.byggliste { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.byggkort {
+  gap: 4px; padding: 10px 8px 12px; border-radius: 20px; border: 3px solid var(--tre-lys); color: var(--tekst);
+  background: linear-gradient(180deg, var(--perg-lys), var(--panel) 55%, var(--perg-mork));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 5px 0 var(--tre), 0 9px 12px var(--knapp-fall);
+}
+.byggkort:active { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 1px 0 var(--tre), 0 2px 4px var(--knapp-fall); transform: translateY(4px) scale(0.98); }
+@media (hover: hover) { .byggkort:hover { transform: translateY(-4px); } .byggkort:hover:active { transform: translateY(4px) scale(0.98); } }
+.byggkort img { max-width: 124px; padding: 4px; border-radius: 14px; background: var(--felt-bunn); box-shadow: inset 0 3px 6px rgba(90, 60, 20, 0.28); }
+.byggkort .bn { font-size: 17px; font-weight: 800; line-height: 1.15; color: var(--tittel); }
+.byggkort .bp {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 14px; border-radius: 999px; font-size: 18px; font-weight: 900; color: #3a2600;
+  background: linear-gradient(180deg, var(--gull-lys), var(--gull-mid) 60%, var(--gull-mork)); border: 2px solid var(--messing-mork);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 2px 0 var(--messing-mork); font-variant-numeric: tabular-nums;
+}
+.byggkort .bm { font-size: 14px; font-weight: 700; color: var(--feil); }
+.byggkort .bl {
+  font-size: 14px; font-weight: 800; padding: 2px 10px; border-radius: 999px; color: #1f4d70; background: rgba(44, 95, 134, 0.12); border: 1px solid rgba(44, 95, 134, 0.35);
+}
+.byggkort.dyr { opacity: 1; }
+.byggkort.dyr img { filter: grayscale(0.55); opacity: 0.75; }
+.byggkort.dyr .bp { background: linear-gradient(180deg, #e8e0cc, #cfc4a6); border-color: #a89c78; color: #5b5240; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6); }
+/* Låst eller allerede bygget: dempet, flatt kort uten fjær */
+.byggkort.laast {
+  border-color: #a89c78; border-style: dashed; box-shadow: inset 0 3px 8px rgba(90, 60, 20, 0.25);
+  background: repeating-linear-gradient(135deg, #ddd2b3 0 10px, #d3c7a6 10px 20px);
+}
+.byggkort.laast img { filter: grayscale(1); opacity: 0.5; }
+.byggkort.laast .bn, .byggkort.laast .bp { opacity: 0.7; }
+.byggkort.laast .bl { opacity: 1; color: #3d3524; background: rgba(255, 255, 255, 0.55); border-color: rgba(60, 50, 30, 0.4); }
+.byggkort.havn { border-color: #2c5f86; background: linear-gradient(180deg, #f2faff, #d6ebf8); box-shadow: inset 0 2px 0 #fff, 0 5px 0 #1f4a6b, 0 9px 12px var(--knapp-fall); }
+.byggkort.havn.laast { border-color: #6f8ea5; background: repeating-linear-gradient(135deg, #cdd9e0 0 10px, #c0cfd8 10px 20px); box-shadow: inset 0 3px 8px rgba(30, 60, 90, 0.25); }
+.byggkort.skole { border-color: #9a3a2c; background: linear-gradient(180deg, #fff6f2, #ffdcd2); box-shadow: inset 0 2px 0 #fff, 0 5px 0 #6e281e, 0 9px 12px var(--knapp-fall); }
+.byggkort.skole.laast { background: repeating-linear-gradient(135deg, #e6d3cc 0 10px, #dcc7bf 10px 20px); box-shadow: inset 0 3px 8px rgba(90, 30, 20, 0.25); border-color: #a8847c; }
+.byggkort.hemmelig { border: 3px dashed var(--tre-lys); background: transparent; box-shadow: none; animation: puls 2.4s ease-in-out infinite; }
+.byggkort.hemmelig .sporsmal { font-size: 46px; }
+@keyframes puls { 50% { transform: scale(1.04); } }
+.butikk-overskrift { font-size: 20px; font-weight: 900; color: var(--tittel); padding: 6px 4px 0; border-bottom: 3px solid var(--felt-kant); }
+body.neon .byggkort { color: #f6eaff; border-color: #6c3bd1; }
+body.neon .byggkort .bn { color: #ffd6f6; }
+body.neon .byggkort .bl { color: #bff4ff; background: rgba(25, 227, 255, 0.12); border-color: rgba(25, 227, 255, 0.4); }
+body.neon .byggkort.laast { background: repeating-linear-gradient(135deg, #1d0e3a 0 10px, #170a30 10px 20px); }
+body.neon .byggkort.laast .bl { color: #f6eaff; background: rgba(255, 255, 255, 0.12); }
+body.neon .byggkort.havn.laast, body.neon .byggkort.skole.laast { background: repeating-linear-gradient(135deg, #1d0e3a 0 10px, #170a30 10px 20px); }
+body.neon .byggkort img, body.neon .selgrad .vi { background: #150a2a; }
+
+.takfarge { gap: 8px 14px; margin-top: 14px; padding: 10px 12px; border-radius: 18px; background: var(--felt-bunn); box-shadow: inset 0 3px 8px rgba(90, 60, 20, 0.22); color: var(--tittel); font-size: 18px; }
+.takfarger { gap: 8px; }
+.takfarger button { width: 46px; height: 46px; border-width: 3px; }
+.takfarger button.valgt { transform: scale(1.15); }
+.takfarger button:active { transform: scale(0.92); }
+
+/* ================= Sjøkart, spillere, foreldre, lærer ================= */
+.oyliste, .spillerliste, .arter { gap: 10px; }
+.oyrad, .spillerrad, .artrad, .stat-rute, .stat-arter {
+  background: linear-gradient(180deg, var(--felt), var(--felt-bunn)); border: 2px solid var(--felt-kant);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 3px 0 var(--felt-kant);
+}
+.oyrad { border-radius: 18px; padding: 10px 14px; }
+.oyrad.her { background: linear-gradient(180deg, #fffbe0, #ffefa8); border-color: var(--messing); }
+.oyrad .oyikon { font-size: 40px; }
+.oyrad .oynavn b { font-size: 21px; color: var(--tittel); }
+.oyrad .oynavn small { font-size: 16px; color: var(--svak); }
+.oyrad .seil-merke { background: linear-gradient(180deg, var(--gull-lys), var(--gull-mid) 60%, var(--gull-mork)); border-color: var(--messing-mork); font-size: 18px; padding: 8px 16px; color: #3a2600; }
+button.oyrad { min-height: 72px; }
+button.oyrad:active { background: linear-gradient(180deg, #fffbe0, #ffefa8); }
+.spillerrad { border-radius: 18px; padding: 8px 12px; }
+.spillerrad .ava { font-size: 36px; }
+.spillerrad .sn { font-size: 19px; font-weight: 700; }
+.spillerrad .sn small { font-size: 16px; color: var(--svak); }
+.spillerrad button { color: var(--feil); border-color: #e3b5b5; }
+.artrad { border-radius: 16px; padding: 8px 10px; }
+.artrad .tak { font-size: 16px; color: var(--svak); }
+.bryter { min-width: 160px; }
+.bryter.paa { background: linear-gradient(180deg, #d9f8e2, #a6e8bd); border-color: var(--riktig); color: #14502b; }
+.valgrad.liten button { min-height: 44px; padding: 2px 12px; }
+.eksempel { font-size: 17px; }
+.kreativ small { font-size: 16px; color: var(--svak); }
+.kreativ-merke { font-size: 17px; }
+.stat-gruppe h3 { font-size: 18px; color: var(--tittel); }
+.stat-rute { border-radius: 14px; padding: 8px 12px; }
+.stat-rute small { font-size: 14px; color: var(--svak); }
+.stat-arter { font-size: 16px; }
+.stat-arter th { background: var(--felt-bunn); }
+.emner button { min-height: 46px; font-size: 17px; padding: 4px 14px; }
+.laerer-tekst {
+  padding: 16px 20px; font-size: 24px; background: linear-gradient(180deg, var(--felt), var(--felt-bunn)); border: 2px solid var(--felt-kant);
+  box-shadow: inset 0 3px 8px rgba(90, 60, 20, 0.18);
+}
+.laerer-tekst .lt-tittel { color: var(--tittel); }
+#port .tastatur { margin: 6px auto; }
+.matte-svar.kode { letter-spacing: 8px; }
+#port-glemt { font-size: 17px; }
+
+/* ================= Natt, museum, kirke ================= */
+.natt-tekst { font-size: 34px; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6); }
+.museum-knapp { min-height: 52px; font-size: 19px; }
+.seiling-tekst { font-size: 32px; }
+
+/* ================= Tilgjengelighet: mindre bevegelse ================= */
+@media (prefers-reduced-motion: reduce) {
+  dialog.kort, dialog.kort[open], dialog.kort::backdrop, button, .dunk, .melding.vis, .plasser, .byggkort, .byggkort.hemmelig,
+  .profil, .velg .logo, #velg::before, #velg::after, .svarvalg.riktig {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important;
+  }
+}
