@@ -69,10 +69,9 @@ export const INSTR = {
     sus(7000, 6000, { lengde: 0.012, volum: 0.04 * v, q: 3, send: 0.2 });
   },
 
-  // Tåka: luftig sus og en lys klokketone.
+  // Tåka: bare en søt, lys plingetone (ingen brus).
   sus(f, v = 1) {
-    sus(400, 3200, { lengde: 0.4, volum: 0.14 * v, q: 0.7, a: 0.06, send: 0.5, kurve: 'lin' });
-    overtoner(f, [[1, 0.17, 1.1], [2.76, 0.04, 0.4]], { volum: v, start: 0.06, send: 0.6 });
+    overtoner(f, [[1, 0.17, 1.1], [2.76, 0.04, 0.4]], { volum: v * 1.3, send: 0.6 });
   },
 };
 

@@ -227,7 +227,6 @@ function behandle(hendelser, i) {
       else {
         t.borstAnim.delete(i);
         t.avdekkAnim.set(i, naa());
-        L.vend();
         if (h.ting) setTimeout(() => sprut(kx, ky, { farger: ['#ffd23f', '#ffe58a', '#fff4c2'], antall: 16 }), 300);
       }
     } else if (h.type === 'tomSol') {
