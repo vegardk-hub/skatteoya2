@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>lydmåling</title>
+<pre id="ut">kjører …</pre>
+<script type="module">
+import * as M from '../js/lyd/motor.js';
+import * as T from '../js/trykk/toner.js';
+
+const SR = 44100;
+const rapport = [];
+
+function analyser(buf, navn, forventetHz = null) {
+  const L = buf.getChannelData(0), R = buf.getChannelData(1);
+  let topp = 0, sum = 0, klipp = 0;
+  for (let i = 0; i < L.length; i++) {
+    const v = Math.max(Math.abs(L[i]), Math.abs(R[i]));
+    if (v > topp) topp = v;
+    if (v >= 0.999) klipp++;
+    sum += L[i] * L[i];
+  }
+  const rms = Math.sqrt(sum / L.length);
+  // sist lyd over -60 dB
+  let slutt = 0;
+  for (let i = L.length - 1; i >= 0; i--) if (Math.abs(L[i]) > 0.001) { slutt = i; break; }
+  // grunntone via autokorrelasjon (på et vindu etter anslaget)
+  let hz = null;
+  if (forventetHz) {
+    const a0 = Math.floor(0.03 * SR), n = 4096;
+    let best = 0, bestLag = 0;
+    const lo = Math.floor(SR / (forventetHz * 2.2)), hi = Math.floor(SR / (forventetHz / 2.2));
+    for (let lag = lo; lag < hi; lag++) {
+      let c = 0;
+      for (let i = 0; i < n; i++) c += L[a0 + i] * L[a0 + i + lag];
+      if (c > best) { best = c; bestLag = lag; }
+    }
+    hz = bestLag ? SR / bestLag : null;
+  }
+  rapport.push({ navn, topp: +topp.toFixed(3), rmsDb: +(20 * Math.log10(rms + 1e-9)).toFixed(1), klipp, varighet: +(slutt / SR).toFixed(2), hz: hz && +hz.toFixed(1), forventet: forventetHz });
+}
+
+async function maal(navn, sek, kjor, forventetHz) {
+  const ctx = new OfflineAudioContext(2, SR * sek, SR);
+  M.brukKontekst(ctx);
+  M.settLyd(true);
+  kjor();
+  const buf = await ctx.startRendering();
+  analyser(buf, navn, forventetHz);
+}
+
+try {
+  const instr = { xylofon: 2, hogg: 1, treblokk: 2, ambolt: 2, plask: 1, floyte: 2, spilledaase: 4, sus: 1 };
+  for (const [navn, mult] of Object.entries(instr)) {
+    await maal(`instrument ${navn} C5`, 3, () => T.INSTRUMENT[navn](523.25), navn === 'xylofon' || navn === 'floyte' || navn === 'spilledaase' ? 523.25 * mult : null);
+  }
+  for (const n of ['knapp', 'aapne', 'lukk', 'mynt', 'riktig', 'feil', 'tomt', 'vend', 'kisteAapne', 'byggSatt', 'fanfare', 'stjerne', 'solnedgang', 'morgen', 'idé', 'strok']) {
+    await maal(`hendelse ${n}`, 4, () => T[n](1), null);
+  }
+  // akkurat tonene: alle instrumentene på tvers av hele sangen
+  await maal('stress: 40 stemmer samtidig', 3, () => { for (let k = 0; k < 40; k++) T.INSTRUMENT.ambolt(220 + k * 7, 1); }, null);
+  await maal('stress: hurtig xylofon x16', 3, () => { for (let k = 0; k < 16; k++) setTimeout(() => {}, 0), T.INSTRUMENT.xylofon(392 + k * 20); }, null);
+  // melodi: ode til gleden (E4 først)
+  const ode = T.SANG.ode;
+  await maal('melodi: ode (klaver+pute)', 16, () => { T.spillMelodi('ode', 99); }, null);
+  // stemning
+  await maal('stemning: dag', 6, () => { T.stemning.start(); T.stemning.sett('dag'); }, null);
+  document.getElementById('ut').textContent = JSON.stringify(rapport);
+} catch (e) {
+  document.getElementById('ut').textContent = 'FEIL ' + e.message + e.stack;
+}
+document.title = 'ferdig';
+</script>

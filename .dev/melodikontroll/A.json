@@ -1,0 +1,167 @@
+[
+ {
+  "id": "ode",
+  "status": "ok",
+  "endringer": "Tonehøyder, rytme og frasegrenser stemmer med temaet. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Ode_to_Joy",
+  "navn": "Ode til gleden",
+  "av": "Ludwig van Beethoven",
+  "gruppe": "klassisk",
+  "tempo": 132,
+  "deler": [
+   8,
+   15
+  ],
+  "noter": "E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | E4. D4, D4- | E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | D4. C4, C4-"
+ },
+ {
+  "id": "elise",
+  "status": "ok",
+  "endringer": "Tonehøyder og rytme (sekstendedeler, 3/8) stemmer med begynnelsen; deler [9,17] gir riktige frasegrenser. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/F%C3%BCr_Elise",
+  "navn": "Für Elise",
+  "av": "Ludwig van Beethoven",
+  "gruppe": "klassisk",
+  "tempo": 250,
+  "deler": [
+   9,
+   17
+  ],
+  "noter": "E5 D#5 | E5 D#5 E5 B4 D5 C5 | A4- r C4 E4 A4 | B4- r E4 G#4 B4 | C5- r E4 E5 D#5 | E5 D#5 E5 B4 D5 C5 | A4- r C4 E4 A4 | B4- r E4 C5 B4 | A4---"
+ },
+ {
+  "id": "skjebne",
+  "status": "rettet",
+  "endringer": "Fjernet den siste delen (Ab/Eb5/C5), som ikke er en del av det kjente åpningsmotivet. Beholder G-G-G-Eb og F-F-F-D med fermatholdt slutt; deler [4,8] stemmer. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Symphony_No._5_(Beethoven)",
+  "navn": "Skjebnesymfonien",
+  "av": "Ludwig van Beethoven",
+  "gruppe": "klassisk",
+  "tempo": 150,
+  "deler": [
+   4,
+   8
+  ],
+  "noter": "r, G4, G4, G4, | Eb4--- | r, F4, F4, F4, | D4---"
+ },
+ {
+  "id": "nattmusikk",
+  "status": "ok",
+  "endringer": "Tonehøyde, rytme (G r D G r D / G D G B D / C r A C r A / C A F# A D) og deler [4,9] stemmer. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://sca.uwaterloo.ca/Mutopia/cgibin/piece-info.cgi?id=900 ; https://en.wikipedia.org/wiki/Eine_kleine_Nachtmusik",
+  "navn": "En liten nattmusikk",
+  "av": "Wolfgang Amadeus Mozart",
+  "gruppe": "klassisk",
+  "tempo": 132,
+  "deler": [
+   4,
+   9
+  ],
+  "noter": "G4 r, D4, G4 r, D4, | G4, D4, G4, B4, D5- | C5 r, A4, C5 r, A4, | C5, A4, F#4, A4, D4-"
+ },
+ {
+  "id": "sym40",
+  "status": "ukontrollert",
+  "endringer": "De ni første tonene (Eb D D x3) og sprang opp til Bb virker riktige, men fortsettelsen (A G F Eb D C) og slutten på C er ikke bekreftet, og tonearten/oktaven er ikke sjekket. Trenger partitur (IMSLP K.550, mfiles.co.uk).",
+  "kilde": "https://www.mfiles.co.uk/scores/mozart-symphony40-1.htm ; https://imslp.org/wiki/Symphony_No.40_in_G_minor,_K.550_(Mozart,_Wolfgang_Amadeus)",
+  "navn": "Symfoni nr. 40",
+  "av": "Wolfgang Amadeus Mozart",
+  "gruppe": "klassisk",
+  "tempo": 200,
+  "deler": [
+   6,
+   10
+  ],
+  "noter": "Eb4, D4, | D4 Eb4, D4, D4 Eb4, D4, | D4 Bb4 r Bb4, A4, | G4 G4, F4, Eb4 Eb4, D4, | C4 C4-"
+ },
+ {
+  "id": "tyrkisk",
+  "status": "ok",
+  "endringer": "Mønsteret B A G# A C / D C B C E / F E D# E B A G# A B A G# A C stemmer, deler [5,10] likeså. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Piano_Sonata_No._11_(Mozart)",
+  "navn": "Tyrkisk marsj",
+  "av": "Wolfgang Amadeus Mozart",
+  "gruppe": "klassisk",
+  "tempo": 126,
+  "deler": [
+   5,
+   10
+  ],
+  "noter": "B4; A4; G#4; A4; C5 r | D5; C5; B4; C5; E5 r | F5; E5; D#5; E5; B5; A5; G#5; A5; B5; A5; G#5; A5; C6-"
+ },
+ {
+  "id": "sonate",
+  "status": "ukontrollert",
+  "endringer": "Åpningen C-E-G / B-C-D-C virker riktig, men oktav (venstre/høyre hånd) og rytmen i takt 3-4 (A-G-C… G F E F E) er usikker og ikke bekreftet. Trenger partitur (K.545, IMSLP/Mutopia).",
+  "kilde": "https://imslp.org/wiki/Piano_Sonata_No.16_in_C_major,_K.545_(Mozart,_Wolfgang_Amadeus)",
+  "navn": "Sonate i C-dur",
+  "av": "Wolfgang Amadeus Mozart",
+  "gruppe": "klassisk",
+  "tempo": 126,
+  "deler": [
+   4,
+   7
+  ],
+  "noter": "C4- E4 G4 | B3. C4; D4; C4- r | A4- G4 C5 | G4 F4, E4; F4; E4-"
+ },
+ {
+  "id": "menuett",
+  "status": "ok",
+  "endringer": "Takt for takt (D5 G A B C / D5 G G / E5 C D E F# / G5 G G / C5 D C B A / B C B A G / F# G A B G / B A) stemmer med Petzolds første del; deler [8,16] likeså. Komponisten er Christian Petzold (tidligere tilskrevet Bach), død 1733, PD. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Minuet_in_G_major,_BWV_Anh._114",
+  "navn": "Menuett i G-dur",
+  "av": "Christian Petzold (fra Bachs notebok)",
+  "gruppe": "klassisk",
+  "tempo": 126,
+  "deler": [
+   8,
+   16
+  ],
+  "noter": "D5 G4, A4, B4, C5, | D5 G4 G4 | E5 C5, D5, E5, F#5, | G5 G4 G4 | C5 D5, C5, B4, A4, | B4 C5, B4, A4, G4, | F#4 G4, A4, B4, G4, | B4 A4-"
+ },
+ {
+  "id": "jesus",
+  "status": "ukontrollert",
+  "endringer": "Koraltemaet (Schop/Bach) er skrevet fra hukommelsen; frasene etter «G5 F#5» og de siste fire frasene kunne ikke bekreftes uten partitur. Dessuten er det triolfiguren i akkompagnementet mange kjenner, ikke koralen; vurder om koralen er riktig valg. Trenger partitur (BWV 147 / 639).",
+  "kilde": "https://en.wikipedia.org/wiki/Jesu,_Joy_of_Man%27s_Desiring",
+  "navn": "Jesus, du min glede",
+  "av": "Johann Sebastian Bach",
+  "gruppe": "klassisk",
+  "tempo": 200,
+  "deler": [
+   8,
+   17
+  ],
+  "noter": "r G4 A4 | B4 D5 C5 C5 E5 D5 D5 G5 F#5 | G5 D5 B4 G4 A4 B4 | C5 D5 E5 D5 C5 B4 | A4 B4 G4 F#4 G4 A4 | D4 F#4 A4 C5 B4 A4 | B4 G4--"
+ },
+ {
+  "id": "toccata",
+  "status": "ok",
+  "endringer": "Rekkefølgen A G A / G F E D C# D / A G A / E F C# D stemmer med kjente åpning (BWV 565), oktaver og rytme er forenklet men gjenkjennelig. Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Toccata_and_Fugue_in_D_minor,_BWV_565",
+  "navn": "Toccata og fuge i d-moll",
+  "av": "Johann Sebastian Bach",
+  "gruppe": "klassisk",
+  "tempo": 100,
+  "deler": [
+   3,
+   9
+  ],
+  "noter": "A4; G4; A4--- r | G4; F4; E4; D4; C#4- D4--- r | A3; G3; A3--- r | E3, F3, C#3, D3---"
+ },
+ {
+  "id": "preludium",
+  "status": "ok",
+  "endringer": "Takt 1-3 (C E G C E / C D A D F / B D G D F) stemmer med BWV 846, takt 4 er gjentakelse av C-akkorden (original takt 4 er C-dur igjen). Ikke notert tone for tone mot nedlastet partitur (Mutopia-/IMSLP-notene finnes bare som zip/PDF/MIDI, som ikke kunne leses uten nedlasting). Vurdert ut fra kjent notebilde.",
+  "kilde": "https://en.wikipedia.org/wiki/Prelude_and_Fugue_in_C_major,_BWV_846",
+  "navn": "Preludium i C-dur",
+  "av": "Johann Sebastian Bach",
+  "gruppe": "klassisk",
+  "tempo": 280,
+  "deler": [
+   8,
+   16
+  ],
+  "noter": "C4 E4 G4 C5 E5 G4 C5 E5 | C4 D4 A4 D5 F5 A4 D5 F5 | B3 D4 G4 D5 F5 G4 D5 F5 | C4 E4 G4 C5 E5 G4 C5 E5-"
+ }
+]

@@ -275,6 +275,7 @@ function aapneNaer(i, { pynt = null } = {}) {
   const ting = pynt ? null : R.tingVed(t.spill, t.verden, i);
   if (!ting && !pynt) return;
   const kiste = ting?.type === 'kiste';
+  L.stemning.sett('inne');
   const boks = $('naer');
   boks.classList.toggle('med-matte', kiste);
   const liggende = innerWidth > innerHeight * 1.15;
@@ -320,7 +321,7 @@ function trykkNaer(e) {
     // Bygg man har satt ut: en liten fest når man trykker på dem.
     n.tTrykk = naa() / 1000;
     sprutNaer(n, x, y, 14, 1.2, ['#ffd23f', '#e0393e', '#3a74d8', '#25b86a', '#ffffff']);
-    L.fanfare(1);
+    L.rakett();
     return;
   }
   if (n.ting.type === 'kiste') return;   // kister åpnes med regnestykket under
@@ -352,7 +353,7 @@ function trykkNaer(e) {
 
 function ferdigNaer(n, h, r) {
   n.tFerdig = naa() / 1000;
-  setTimeout(() => L.fanfare(n.ting.str + 1), 180);
+  setTimeout(() => (n.ting.type === 'kiste' ? L.kisteAapne() : L.fanfare(n.ting.str + 1)), 180);
   sprutNaer(n, n.S / 2, n.S * 0.55, 12 + n.ting.str * 8, 1.4);
   setTimeout(() => flyTil(h.gave, { x: r.left + r.width / 2, y: r.top + n.S / 2 }), 550);
   // Melodiene samles i sangboka (i stavkirka): en ny melodi, eller hele melodien når en stor ting er ferdig.
@@ -489,6 +490,8 @@ function lukkNaer() {
   const kveld = t.naer.kveld || (t.spill.sol <= 0 && !t.spill.evigDag);
   t.naer = null;
   $('naer').hidden = true;
+  L.stemning.sett(t.natt ? 'natt' : 'dag');
+  L.lukk();
   t.skitten = true;
   if (kveld) setTimeout(startNatt, 400);
 }
@@ -673,7 +676,7 @@ function svar(verdi, knapp = null) {
     $('matte-melding').className = 'matte-melding feil';
     if (knapp) knapp.classList.add('feil');
     rist($('matte'));
-    L.tomt();
+    L.feil();
     return;
   }
   $('matte-svar').textContent = String(o.fasit);
@@ -929,8 +932,7 @@ function selgVare(varer, knapp) {
     for (const h of R.selg(t.spill, v)) { sum += h.sum; trekkVist(v, n); }
   }
   if (!sum) return;
-  L.INSTRUMENT.xylofon(523.25);
-  setTimeout(() => L.INSTRUMENT.xylofon(783.99), 120);
+  L.mynt(Math.min(4, Math.ceil(sum / 25)));
   flyTil({ mynter: sum }, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
   lagreSnart();
   setTimeout(tegnButikk, 50);
@@ -1002,7 +1004,7 @@ function plasserHer(i) {
   const [kx, ky] = midtAv(i);
   sprut(kx, ky, { farger: ['#c8a26b', '#e3cfa1', '#8a6a3c'], antall: 22, fart: 1.6 });
   setTimeout(() => sprut(kx, ky - 30, { farger: ['#ffd23f', '#e0393e', '#3a74d8', '#25b86a'], antall: 24, fart: 1.4 }), 350);
-  L.fanfare(2);
+  L.byggSatt();
   melding(`${BYGG_ETTER_ID[id].navn} står ferdig!`, { ikon: '🎉' });
   avbrytPlassering();
   lagreSnart();
@@ -1388,6 +1390,7 @@ function startNatt() {
   t.natt = { t0: naa() / 1000, skudd: [], gnister: [], neste: naa() / 1000 + 0.8, slutt: null,
     stjerner: Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.85, r: 0.6 + Math.random() * 1.4, fase: Math.random() * 6 })) };
   L.solnedgang();
+  L.stemning.sett('natt');
   t.natt.full = t.spill.nattFangst >= MAKS_STJERNER;
   oppdaterNattTekst();
   $('natt').hidden = false;
@@ -1412,6 +1415,7 @@ function godMorgen() {
   t.natt.slutt = naa() / 1000;
   L.vekk();
   L.morgen();
+  L.stemning.sett('dag');
   setTimeout(() => {
     t.natt = null;
     $('natt').hidden = true;
@@ -2119,6 +2123,21 @@ function sloyfe() {
 // ---------------------------------------------------------------------------
 function start() {
   visVersjon();
+  // Lyd: stemningen starter ved første trykk (krav på iPad), alle knapper får en myk lyd,
+  // og dialoger åpner og lukker seg med et sveip.
+  document.addEventListener('pointerdown', (e) => {
+    L.stemning.start();
+    const k = e.target.closest?.('button');
+    if (k && !k.closest('#matte-tast, #port-tast')) L.knapp();
+  }, true);
+  for (const [metode, lyd] of [['showModal', L.aapne], ['close', L.lukk]]) {
+    const orig = HTMLDialogElement.prototype[metode];
+    HTMLDialogElement.prototype[metode] = function (...a) {
+      const var_ = this.open;
+      orig.apply(this, a);
+      if (var_ !== this.open) lyd();
+    };
+  }
   // Statistikk: alle trykk mens spillet er åpent, og tiden man har hatt spillet framme.
   document.addEventListener('pointerdown', () => { if (t.spill && !$('spill').hidden) t.spill.stat.klikk++; }, true);
   setInterval(() => {
