@@ -1,0 +1,167 @@
+[
+ {
+  "id": "lisa",
+  "status": "rettet",
+  "endringer": "Dagens versjon hadde en ekstra gjentakelse av «A A A A G---» som kilden ikke har. Kilden går direkte fra G-frasen til F F F F E E D D D D C. Deler justert til [6,11] (første frase C D E F G G, andre A A A A G).",
+  "kilde": "http://www.seland-musikk.no/wp-content/uploads/2014/10/Lisa-gikk-til-skolen-bes.mid (MIDI, C-dur, trad.)",
+  "navn": "Lisa gikk til skolen",
+  "av": "Barnesang",
+  "gruppe": "sang",
+  "tempo": 120,
+  "deler": [
+   6,
+   11
+  ],
+  "noter": "C4 D4 E4 F4 | G4- G4- | A4 A4 A4 A4 | G4--- | F4 F4 F4 F4 | E4- E4- | D4 D4 D4 D4 | C4---"
+ },
+ {
+  "id": "bjornen",
+  "status": "ukontrollert",
+  "endringer": "Fant ingen notekilde som kunne leses (Wikipedia har bare skannet bilde, naturfag.no bare bokstaver uten rytme). Melodien skal være en forenklet utgave av Bellmans «Gubben Noak» (PD), og dagens noter ser plausible ut, men er ikke bekreftet tone for tone.",
+  "kilde": "https://en.wikipedia.org/wiki/Bj%C3%B6rnen_sover (kun opphav)",
+  "navn": "Bjørnen sover",
+  "av": "Barnesang",
+  "gruppe": "sang",
+  "tempo": 120,
+  "deler": [
+   8,
+   13
+  ],
+  "noter": "C4 C4 C4 E4 | D4 D4 D4 F4 | E4 E4 D4 D4 | C4--- | E4 E4 E4 E4 | G4- F4- | D4 D4 D4 D4 | F4- E4- | C4 C4 C4 E4 | D4 D4 D4 F4 | E4 E4 D4 D4 | C4---"
+ },
+ {
+  "id": "allefugler",
+  "status": "rettet",
+  "endringer": "Takt 2 hadde feil rytme (A4 C5. A4, G4): skal være A4 C5, A4, G4-- (G er to slag). Melodien manglet slutten (endte på D): la til gjentakelse av første fire takter slik at den ender på C. Deler [8,14] stemmer med frasegrensene.",
+  "kilde": "https://de.wikibooks.org/wiki/Liederbuch/_Alle_V%C3%B6gel_sind_schon_da ; https://commons.wikimedia.org/wiki/File:Alle_V%C3%B6gel_sind_schon_da.mid",
+  "navn": "Alle fugler",
+  "av": "Tysk folketone",
+  "gruppe": "sang",
+  "tempo": 120,
+  "deler": [
+   8,
+   14
+  ],
+  "noter": "C4. E4, G4 C5 | A4 C5, A4, G4- | F4. G4, E4 C4 | D4- C4- | G4 G4 F4 F4 | E4 G4, E4, D4- | G4 G4 F4 F4 | E4 G4, E4, D4- | C4. E4, G4 C5 | A4 C5, A4, G4- | F4. G4, E4 C4 | D4- C4-"
+ },
+ {
+  "id": "london",
+  "status": "rettet",
+  "endringer": "Siste tone mangler ett slag: «a8 f4.» i kilden gir E4 C4-- (tre åttedeler), ikke C4-. Tempo 120 var for tregt for åttedels-enheten (kilden 102 per fjerdedel = ca. 200 per åttedel), satt til 190.",
+  "kilde": "https://en.wikipedia.org/wiki/London_Bridge_Is_Falling_Down (LilyPond i wikitekst)",
+  "navn": "London Bridge",
+  "av": "Engelsk barnesang",
+  "gruppe": "sang",
+  "tempo": 190,
+  "deler": [
+   7,
+   13
+  ],
+  "noter": "G4. A4, G4 F4 | E4 F4 G4- | D4 E4 F4- | E4 F4 G4- | G4. A4, G4 F4 | E4 F4 G4- | D4- G4- | E4 C4--"
+ },
+ {
+  "id": "susanna",
+  "status": "rettet",
+  "endringer": "Verselinjene stemmer tone for tone med kilden (G-dur transponert til C). Eneste endring: deler [7,15] i stedet for [6,15], slik at første frase slutter på «Alabama» (G) og ikke midt i et ord.",
+  "kilde": "https://de.wikibooks.org/wiki/Liederbuch/_Oh_Susanna (LilyPond, Stephen Foster 1848)",
+  "navn": "Oh! Susanna",
+  "av": "Stephen Foster",
+  "gruppe": "sang",
+  "tempo": 132,
+  "deler": [
+   7,
+   15
+  ],
+  "noter": "C4, D4, | E4 G4 G4. A4, | G4 E4 C4. D4, | E4 E4 D4 C4 | D4-- C4, D4, | E4 G4 G4. A4, | G4 E4 C4. D4, | E4 E4 D4 D4 | C4--"
+ },
+ {
+  "id": "yankee",
+  "status": "rettet",
+  "endringer": "Åttende tone i første linje var G3, skal være B3 (ledetone ned mot C) ifølge MIDI-kilden; siste tone i linje 1 er kort (B3, ikke B3-). Resten av tonehøydene stemmer. Rytmen er forenklet i forhold til kilden. Lavere sikkerhet enn de andre.",
+  "kilde": "https://commons.wikimedia.org/wiki/File:Yankee_Doodle_(pg).mid",
+  "navn": "Yankee Doodle",
+  "av": "Amerikansk folketone",
+  "gruppe": "sang",
+  "tempo": 200,
+  "deler": [
+   7,
+   14
+  ],
+  "noter": "C4 C4 D4 E4 | C4 E4 D4 B3 | C4 C4 D4 E4 | C4- B3 | C4 C4 D4 E4 | F4 E4 D4 C4 | B3 G3 A3 B3 | C4- C4-"
+ },
+ {
+  "id": "greensleeves",
+  "status": "rettet",
+  "endringer": "F i takt 1 og 5 skal være F#5 (dorisk A-moll i kilden), ikke F5. Deler endret til [11,19] slik at første frase slutter ved takt 2 og midtre ved «wrong»/E4 i takt 4.",
+  "kilde": "https://de.wikibooks.org/wiki/Liederbuch/_Greensleeves",
+  "navn": "Greensleeves",
+  "av": "Engelsk folketone",
+  "gruppe": "sang",
+  "tempo": 150,
+  "deler": [
+   11,
+   19
+  ],
+  "noter": "A4 | C5- D5 E5. F#5, E5 | D5- B4 G4. A4, B4 | C5- A4 A4. G#4, A4 | B4- G#4 E4- A4 | C5- D5 E5. F#5, E5 | D5- B4 G4. A4, B4 | C5. B4, A4 G#4. F#4, G#4 | A4--"
+ },
+ {
+  "id": "amazing",
+  "status": "rettet",
+  "endringer": "«me» (G5 i takt 8) er to slag (G5-), ikke tre. Deler [9,16]: første frase er «Amazing grace how sweet the sound» (9 toner), midtre slutter på «me» (tone 16).",
+  "kilde": "https://en.wikipedia.org/wiki/Amazing_Grace (LilyPond, G-dur transponert til C) ; https://de.wikibooks.org/wiki/Liederbuch/_Amazing_Grace",
+  "navn": "Amazing Grace",
+  "av": "Folketone",
+  "gruppe": "sang",
+  "tempo": 92,
+  "deler": [
+   9,
+   16
+  ],
+  "noter": "G4 | C5- E5, C5, | E5- D5 | C5- A4 | G4- G4 | C5- E5, C5, | E5- D5 | G5- E5 | G5. E5, G5, E5, | C5- G4 | A4. C5, C5, A4, | G4- G4 | C5- E5, C5, | E5- D5 | C5--"
+ },
+ {
+  "id": "javielsker",
+  "status": "ukontrollert",
+  "endringer": "Fant ingen leselig notekilde (IMSLP har bare skannet PDF, Commons bare bilder). Dagens noter er ikke bekreftet. Nordraak døde 1866, så melodien er fri. Bør sjekkes mot IMSLP «Norsk Fædrelandssang» eller en norsk sangbok.",
+  "kilde": "https://imslp.org/wiki/Norsk_Fædrelandssang_(Nordraak,_Rikard) (kun skann)",
+  "navn": "Ja, vi elsker",
+  "av": "Rikard Nordraak",
+  "gruppe": "sang",
+  "tempo": 100,
+  "deler": [
+   8,
+   13
+  ],
+  "noter": "G4. F4, E4 D4 | C4 D4 E4 F4 | G4. A4, G4 F4 | E4-- r | A4. G4, F4 E4 | D4 E4 F4 G4 | G4. A4, A4 B4 | C5--"
+ },
+ {
+  "id": "bjelleklang",
+  "status": "rettet",
+  "endringer": "Tonehøyder og rytme stemmer med kilden i det som var skrevet, men melodien endte på G (dominant) etter refrengets første halvdel. La til refrengets slutt (kilden takt 13-16: F F F. F, | F E E E, E, | G G F D | C) slik at den ender på C. Deler [6,11].",
+  "kilde": "https://de.wikibooks.org/wiki/Liederbuch/_Jingle_Bells (LilyPond, G-dur transponert til C)",
+  "navn": "Bjelleklang",
+  "av": "James Pierpont",
+  "gruppe": "sang",
+  "tempo": 160,
+  "deler": [
+   6,
+   11
+  ],
+  "noter": "E4 E4 E4- | E4 E4 E4- | E4 G4 C4. D4, | E4--- | F4 F4 F4. F4, | F4 E4 E4 E4, E4, | G4 G4 F4 D4 | C4--"
+ },
+ {
+  "id": "gladejul",
+  "status": "rettet",
+  "endringer": "Melodien sluttet på E midt i verket (etter takt 6 av 12). Erstattet med kilden: takt 1-6 (uendret), så takt 9-12 (D5- D5 F5. D5, B4 | C5-- E5- r | C5. G4, E4 G4. F4, D4 | C4--- C4-). Takt 7-8 er identiske med 5-6 og er utelatt for å holde lengden under 40 toner. Tonehøyder i takt 1-6 stemmer.",
+  "kilde": "https://en.wikipedia.org/wiki/Silent_Night (LilyPond, moderne versjon i C) ; Gruber d. 1863",
+  "navn": "Glade jul",
+  "av": "Franz Gruber",
+  "gruppe": "sang",
+  "tempo": 132,
+  "deler": [
+   8,
+   14
+  ],
+  "noter": "G4. A4, G4 E4-- | G4. A4, G4 E4-- | D5- D5 B4-- | C5- C5 G4-- | A4- A4 C5. B4, A4 | G4. A4, G4 E4-- | D5- D5 F5. D5, B4 | C5-- E5- r | C5. G4, E4 G4. F4, D4 | C4--- C4-"
+ }
+]

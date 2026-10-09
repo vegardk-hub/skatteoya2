@@ -11,6 +11,7 @@ import { PYNT, LIV } from './stil/pynt.js';
 import { TAKE_TRYKK, GRAV_TRYKK } from './data/ting.js';
 import { TERRENGNAVN, tingVed, kanBorstes, pyntVed } from './regler.js';
 import { neonKontekst, neonPaa, glod } from './stil/neon.js';
+import { takeTekstur, takeBunn, skyTekstur, flis } from './stil/lys.js';
 
 export const RUTE = 100;     // verdensenheter per rute
 export const FUGE = 1.5;     // ca. 1,5 % av ruta (målt i forbildet)
@@ -71,10 +72,10 @@ export class Brett {
     const tilf = lagTilfeldig(blandSeed(this.verden.seed, this.verden.forsok, 'kort', i));
     if (innhold.ukjent) tegnUkjent(ctx, str, tilf);
     else if (innhold.pynt) {
-      tegnTomtKort(ctx, str, tilf, innhold.terreng, () => PYNT[innhold.pynt](ctx, str, lagTilfeldig(blandSeed(this.verden.seed, 'pynt', i))));
+      tegnTomtKort(ctx, str, tilf, innhold.terreng, (c) => PYNT[innhold.pynt](c, str, lagTilfeldig(blandSeed(this.verden.seed, 'pynt', i))), { skygge: true });
     } else if (innhold.ting) {
       const levende = LEVENDE_TING.has(innhold.ting.type);
-      tegnTomtKort(ctx, str, tilf, innhold.terreng, levende ? null : () => tegnFigur(ctx, str, innhold.ting, { p: andel(innhold.ting) }));
+      tegnTomtKort(ctx, str, tilf, innhold.terreng, levende ? null : (c) => tegnFigur(c, str, innhold.ting, { p: andel(innhold.ting) }), { skygge: true });
     } else if (innhold.overlegg === 'hjort' || innhold.kryss) {
       tegnKort(ctx, str, tilf, { terreng: innhold.terreng, lysning: true });
     } else tegnKort(ctx, str, tilf, innhold);
@@ -137,6 +138,61 @@ export class Brett {
     return c;
   }
 
+
+  /** Levende tåke over en rute: tre lag som glir i ulik fart og retning (verdenskoordinater, så den henger sammen mellom ruter). */
+  #take(ctx, px, py, tsek, alfa = 1) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, KORT, KORT);
+    ctx.clip();
+    ctx.globalAlpha = 0.8 * alfa;
+    flis(ctx, takeBunn(), px, py, KORT, KORT, px - tsek * 6, py + tsek * 3, 0.9);
+    ctx.globalAlpha = 0.62 * alfa;
+    flis(ctx, takeTekstur(), px, py, KORT, KORT, px + tsek * 13, py - tsek * 5, 0.7);
+    ctx.globalAlpha = 0.42 * alfa;
+    flis(ctx, takeTekstur(), px, py, KORT, KORT, px * 1.3 - tsek * 8 + 90, py * 1.3 + tsek * 6 + 40, 1.3);
+    ctx.restore();
+  }
+
+  /** Vann som lever: glimt av sollys og skum langs kysten. */
+  #vann(ctx, i, px, py, tsek, spill) {
+    const { bredde: B, hoyde: H } = this.verden;
+    const x = i % B, y = Math.floor(i / B);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, KORT, KORT);
+    ctx.clip();
+    for (let k = 0; k < 4; k++) {
+      const sd = i * 31 + k * 17;
+      const fx = px + KORT * (0.12 + 0.76 * (0.5 + 0.5 * Math.sin(tsek * 0.33 + sd)));
+      const fy = py + KORT * (0.12 + 0.76 * (0.5 + 0.5 * Math.cos(tsek * 0.27 + sd * 1.3)));
+      const a = Math.max(0, Math.sin(tsek * 1.6 + sd)) * 0.55;
+      if (a < 0.03) continue;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#eaffff';
+      ctx.beginPath();
+      ctx.ellipse(fx, fy, KORT * 0.07, KORT * 0.014, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= B || ny >= H) continue;
+      const nb = ny * B + nx;
+      if (!spill.avdekket[nb] || TERRENGNAVN[this.verden.terreng[nb]] === 'vann') continue;
+      const bolge = 0.5 + 0.5 * Math.sin(tsek * 1.5 + i * 0.7 + (dx + dy) * 2);
+      const w = KORT * (0.07 + 0.09 * bolge);
+      const x0 = dx > 0 ? px + KORT - w : dx < 0 ? px : px, y0 = dy > 0 ? py + KORT - w : dy < 0 ? py : py;
+      const bw = dx ? w : KORT, bh = dy ? w : KORT;
+      const g = ctx.createLinearGradient(dx > 0 ? x0 : dx < 0 ? x0 + bw : 0, dy > 0 ? y0 : dy < 0 ? y0 + bh : 0, dx > 0 ? x0 + bw : dx < 0 ? x0 : 0, dy > 0 ? y0 + bh : dy < 0 ? y0 : 0);
+      g.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      g.addColorStop(1, `rgba(255, 255, 255, ${0.35 + 0.35 * bolge})`);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, y0, bw, bh);
+    }
+    ctx.restore();
+  }
+
   /**
    * Tegner brettet. ctx har kameraets transformasjon. utsnitt = synlige ruter.
    * avdekkAnim: rute → starttid for kort som snus fram. borstAnim: rute → tid for siste strøk.
@@ -161,11 +217,20 @@ export class Brett {
         const px = x * RUTE + FUGE / 2, py = y * RUTE + FUGE / 2;
         const start = avdekkAnim.get(i);
         if (start !== undefined) {
-          // Kortet snus: tåka smalner inn, det nye kortet vokser fram.
-          const p = Math.min(1, (naa - start) / 450);
-          const sx = Math.abs(Math.cos(Math.PI * p));
-          const bilde = p < 0.5 ? this.hent(-1 - i, i, { ukjent: true }, str) : this.hent(i, i, innhold, str);
-          ctx.drawImage(bilde, px + KORT * (1 - sx) / 2, py, KORT * sx, KORT);
+          // Tåka letter: kortet under kommer til syne mens tåka sprer seg, blekner og stiger.
+          const p = Math.min(1, (naa - start) / 750);
+          const jevn = p * p * (3 - 2 * p);
+          ctx.drawImage(this.hent(i, i, innhold, str), px, py, KORT, KORT);
+          ctx.save();
+          ctx.globalAlpha = 1 - jevn;
+          const sk = 1 + 0.35 * jevn;
+          ctx.translate(px + KORT / 2, py + KORT / 2 - KORT * 0.08 * jevn);
+          ctx.scale(sk, sk);
+          ctx.rotate(0.06 * jevn);
+          ctx.drawImage(this.hent(-1 - i, i, { ukjent: true }, str), -KORT / 2, -KORT / 2, KORT, KORT);
+          this.#take(ctx, -KORT / 2, -KORT / 2, naa / 1000, 1);
+          ctx.restore();
+          this.harLiv = true;
           if (p >= 1) avdekkAnim.delete(i);
           continue;
         }
@@ -186,10 +251,14 @@ export class Brett {
           const rist = t ? Math.max(0, 1 - (naa - t) / 250) : 0;
           ctx.globalAlpha = innhold.take === 2 ? 0.78 : 0.5;
           ctx.drawImage(this.hent(-1 - i, i, { ukjent: true }, str), px + Math.sin(naa / 20) * rist * 4, py, KORT, KORT);
+          this.#take(ctx, px, py, naa / 1000, innhold.take === 2 ? 0.7 : 0.4);
           ctx.globalAlpha = 1;
+          this.harLiv = true;
           continue;
         }
         ctx.drawImage(this.hent(innhold.ukjent ? -1 - i : i, i, innhold, str), px, py, KORT, KORT);
+        if (innhold.ukjent) { this.#take(ctx, px, py, naa / 1000); this.harLiv = true; }
+        else if (innhold.terreng === 'vann') { this.#vann(ctx, i, px, py, naa / 1000, spill); this.harLiv = true; }
         if (harLiv(innhold)) {
           // Det som beveger seg tegnes oppå kortet, i kortets egne mål.
           this.harLiv = true;
@@ -207,6 +276,21 @@ export class Brett {
           } else tegnHjort(ctx, KORT, tsek, i % 17);
           ctx.restore();
         }
+      }
+    }
+
+    // Skyskygger glir langsomt over øya
+    {
+      const tsek = naa / 1000;
+      const bx0 = Math.max(0, x0) * RUTE, by0 = Math.max(0, y0) * RUTE;
+      const bx1 = (Math.min(B - 1, x1) + 1) * RUTE, by1 = (Math.min(H - 1, y1) + 1) * RUTE;
+      if (bx1 > bx0 && by1 > by0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.2;
+        flis(ctx, skyTekstur(), bx0, by0, bx1 - bx0, by1 - by0, bx0 - tsek * 11, by0 - tsek * 4, 1.8);
+        ctx.restore();
+        this.harLiv = true;
       }
     }
 

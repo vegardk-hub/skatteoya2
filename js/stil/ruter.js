@@ -9,6 +9,7 @@ import {
 import { tegnVei, tegnBane, lagUnngaa, HALVBREDDE } from './veier.js';
 import { settLag } from './neon.js';
 import { spillerfarge } from './spillerfarge.js';
+import { ferdigKort, medSkygge } from './lys.js';
 
 // ---------------------------------------------------------------------------
 // Bunn
@@ -762,8 +763,9 @@ export function tegnKort(ctx, S, tilf, { terreng, bygg, nivaa = 1, overlegg, vei
     const b = BA[BUNN_FOR[terreng]] ?? BA.eng;
     bunn(ctx, S, b, tilf, { flak: 8, tuster: 4 });
     tegnFerdsel(); // på en byggrute går veien inn mot midten, under bygget
-    BYGG[bygg](ctx, S, tilf, nivaa);
+    medSkygge(ctx, S, (c) => BYGG[bygg](c, S, tilf, nivaa));
     kantskygge(ctx, S, b);
+    ferdigKort(ctx, S);
   } else {
     const lag = [];
     for (const v of veier) lag.push({ retninger: v.retninger, halvbredde: S * HALVBREDDE[v.type] });
@@ -776,6 +778,7 @@ export function tegnKort(ctx, S, tilf, { terreng, bygg, nivaa = 1, overlegg, vei
     });
     if (overlegg) OVERLEGG[overlegg](ctx, S, tilf);
     kantskygge(ctx, S, BA[terreng]);
+    ferdigKort(ctx, S, { vann: terreng === 'vann' });
   }
   ctx.restore();
 }
@@ -808,14 +811,15 @@ export function tegnUkjent(ctx, S, tilf, { kryss = false } = {}) {
 }
 
 /** Tomt kort (bare bunnen) med en valgfri egen figur oppå, under kantskyggen. */
-export function tegnTomtKort(ctx, S, tilf, terreng = 'eng', figur = null) {
+export function tegnTomtKort(ctx, S, tilf, terreng = 'eng', figur = null, { skygge = false } = {}) {
   ctx.save();
   BA = BUNN;
   BIOM = 'temperert';
   const b = BA[terreng] ?? BA.eng;
   bunn(ctx, S, b, tilf, { flak: 10, tuster: 5 });
-  figur?.();
+  if (figur) { if (skygge) medSkygge(ctx, S, (c) => figur(c)); else figur(ctx); }
   kantskygge(ctx, S, b);
+  ferdigKort(ctx, S, { vann: terreng === 'vann' });
   ctx.restore();
 }
 

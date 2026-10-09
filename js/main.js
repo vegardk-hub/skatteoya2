@@ -21,6 +21,7 @@ import { spillSeiltur } from './seiltur.js';
 import * as Museum from './museum.js';
 import { settNeon, neonPaa, neonKontekst, glod } from './stil/neon.js';
 import { visVersjon } from './versjon.js';
+import { tegnSjo, tegnLysOverSkjerm } from './stil/lys.js';
 import { TAKFARGER, STANDARD_TAKFARGE, spillerfarge, settSpillerfarge } from './stil/spillerfarge.js';
 import { ikon } from './ikoner.js';
 import { sprut, flytendeTekst, tegnEffekter, harEffekter } from './effekter.js';
@@ -2089,8 +2090,7 @@ function tegnBrett(ms) {
   const k = t.kamera, l = k.lerret;
   const ctx = l.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = BAKGRUNN;
-  ctx.fillRect(0, 0, l.width, l.height);
+  tegnSjo(ctx, l.width, l.height, k, ms / 1000);
   k.anvend(ctx);
   const utsnitt = {
     x0: Math.floor(k.x / RUTE) - 1, y0: Math.floor(k.y / RUTE) - 1,
@@ -2099,6 +2099,7 @@ function tegnBrett(ms) {
   const hint = hintRuter();
   t.brett.tegn(ctx, t.spill, { utsnitt, skala: k.skala, avdekkAnim: t.avdekkAnim, borstAnim: t.borstAnim, byggAnim: t.byggAnim, naa: ms, hint });
   tegnHjelpere(ctx, ms);
+  tegnLysOverSkjerm(ctx, l.width, l.height, t.natt ? 1 : t.spill.evigDag ? 0.45 : 1 - t.spill.sol / SOL[t.spill.nivaa]);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   tegnEffekter(ctx, (kx, ky) => ({ x: (kx - k.x) * k.skala, y: (ky - k.y) * k.skala }), k.skala, k.dpr);
   t.brett.jobb(6);
