@@ -1,0 +1,2205 @@
+// Skatteøya – trykk, tell og regn.
+// Velg spiller → øya med tåke. Børst bort tåka og trykk på ting (tre, stein, jern,
+// fisk, korn, sau); hvert trykk er én tone og ett tall (1, 2, 3 …). Skattekister
+// åpnes med mattestykker og gir sølv, gull og edelsteiner. Skattene selges i
+// butikken, og for myntene kjøper man bygg som settes ut på øya.
+
+import { Kamera } from './kamera.js';
+import { Brett, RUTE, BAKGRUNN } from './brett.js';
+import * as R from './regler.js';
+import * as Lagring from './lagring.js';
+import * as L from './trykk/toner.js';
+import * as M from './matte.js';
+import { tegnMenneske, tegnFigur } from './figurer.js';
+import { tegnTomtKort } from './stil/ruter.js';
+import { PYNT, LIV, tegnBygg, ivrig } from './stil/pynt.js';
+import { poly, fasett } from './stil/lavpoly.js';
+import { TING, VARER, SKATTER, METALLER, EDELSTEINER, SJELDENHET, RAVARER, SOL, NIVAA, AVATARER, BYGG, BYGG_ETTER_ID, HAVN, BAAT, MAKS_STJERNER, SKOLE, OPPFINNELSER, OPPFINNER, LAERER, HJELPER, MUSEUM } from './data/ting.js';
+import { EMNER } from './data/kunnskap.js';
+import * as Stemme from './stemme.js';
+import { spillSeiltur } from './seiltur.js';
+import * as Museum from './museum.js';
+import { settNeon, neonPaa, neonKontekst, glod } from './stil/neon.js';
+import { visVersjon } from './versjon.js';
+import { TAKFARGER, STANDARD_TAKFARGE, spillerfarge, settSpillerfarge } from './stil/spillerfarge.js';
+import { ikon } from './ikoner.js';
+import { sprut, flytendeTekst, tegnEffekter, harEffekter } from './effekter.js';
+import { blandSeed, lagTilfeldig } from './rng.js';
+
+const $ = (id) => document.getElementById(id);
+const naa = () => performance.now();
+const klamp = (u, a = 0, b = 1) => Math.max(a, Math.min(b, u));
+const sprett = (u) => { u = klamp(u); const c = 1.70158; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const t = {
+  id: null, spill: null, verden: null, brett: null, kamera: null,
+  avdekkAnim: new Map(), borstAnim: new Map(), byggAnim: new Map(),
+  naer: null, natt: null, plasser: null, skitten: true, solVis: 0,
+  vist: {},           // det forrådet viser (tingene teller først når de har fløyet ned)
+  lukketVed: -Infinity, lukketNokkel: null,   // når og hvem sin snakkeboble som sist ble lukket
+  tur: null,          // hjelpernes tur ut og hjem om morgenen
+  museum: null,       // museet er åpent: { modus: 'rom' | 'naer' | 'samling', vare, … }
+  laerer: null,       // læreren på skolen, som leser opp kunnskapstekster
+  gutt: null,         // barnet på skolen (samme navn som spilleren), som går rundt og finner på ting
+  velkomst: null,     // en ny hjelper som kommer ut og vinker
+  forrigeStykke: '',
+};
+
+const liten = () => t.spill?.nivaa === 'liten';
+const innst = () => t.spill.foreldre;
+
+try { L.settLyd(localStorage.getItem('oya2-lyd') !== 'av'); } catch { /* ignorer */ }
+
+// ---------------------------------------------------------------------------
+// Tall som leses høyt (valgfritt, foreldrene slår det på)
+// ---------------------------------------------------------------------------
+function siTall(n) {
+  if (!t.spill || !innst().lesOpp || !window.speechSynthesis) return;
+  try { Stemme.si(n); } catch { /* opplesing er pynt */ }
+}
+
+// ---------------------------------------------------------------------------
+// Talltastatur (fra HEX): 1–9, slett, 0, ok
+// ---------------------------------------------------------------------------
+function lagTastatur(el, vedTast) {
+  el.innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'slett', '0', 'ok'].map((k) =>
+    `<button type="button" class="tast${k === 'ok' ? ' tast-ok' : k === 'slett' ? ' tast-slett' : ''}" data-k="${k}">${k === 'slett' ? '⌫' : k === 'ok' ? '✓' : k}</button>`).join('');
+  el.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); L.vekk(); vedTast(b.dataset.k); });
+  });
+}
+
+function rist(el) {
+  el.classList.remove('rister');
+  void el.offsetWidth;
+  el.classList.add('rister');
+}
+
+// ---------------------------------------------------------------------------
+// Velg spiller
+// ---------------------------------------------------------------------------
+function visVelg() {
+  if (t.id && t.spill) Lagring.lagre(t.id, t.spill);
+  t.id = null;
+  t.spill = null;
+  avbrytPlassering();
+  lukkMuseum();
+  lukkSangbok();
+  sisteSal = 0;
+  settNeon(false);
+  document.body.classList.remove('neon');
+  $('spill').hidden = true;
+  $('velg').hidden = false;
+  const liste = Lagring.profiler();
+  $('profilliste').innerHTML = liste.length
+    ? liste.map((p) => `<button class="profil" data-id="${esc(p.id)}">
+        <span class="ava">${esc(p.avatar)}</span><span class="navn">${esc(p.navn)}</span>
+        <span class="info">${NIVAA[p.nivaa]?.ikon ?? ''} Dag ${p.dag}${p.oyNr > 1 ? ` · 🌈 Øy ${p.oyNr}` : p.oyer ? ` · 🏝️ ${p.oyer} øyer` : ''}</span></button>`).join('')
+    : '<p class="tom">Lag en spiller for å begynne!</p>';
+  $('profilliste').querySelectorAll('.profil').forEach((b) => { b.onclick = () => { L.vekk(); startSpill(b.dataset.id); }; });
+}
+
+const ny = { avatar: AVATARER[0], nivaa: 'stor' };
+function aapneNySpiller() {
+  L.vekk();
+  ny.avatar = AVATARER[Math.floor(Math.random() * AVATARER.length)];
+  $('ny-navn').value = '';
+  const tegnValg = () => {
+    $('ny-avatar').innerHTML = AVATARER.map((a) => `<button class="${a === ny.avatar ? 'valgt' : ''}" data-a="${a}">${a}</button>`).join('');
+    $('ny-nivaa').innerHTML = Object.entries(NIVAA).map(([k, n]) =>
+      `<button class="niva ${k === ny.nivaa ? 'valgt' : ''}" data-n="${k}"><b>${n.ikon} ${n.navn}</b><small>${n.forklaring}</small></button>`).join('');
+    $('ny-avatar').querySelectorAll('button').forEach((b) => { b.onclick = () => { ny.avatar = b.dataset.a; tegnValg(); }; });
+    $('ny-nivaa').querySelectorAll('button').forEach((b) => { b.onclick = () => { ny.nivaa = b.dataset.n; tegnValg(); }; });
+  };
+  tegnValg();
+  $('ny').showModal();
+}
+
+function lagNySpiller() {
+  const navn = $('ny-navn').value.trim() || 'Spiller';
+  const spill = R.nyttSpill({ navn, nivaa: ny.nivaa, avatar: ny.avatar });
+  const id = Lagring.nyId();
+  Lagring.lagre(id, spill);
+  $('ny').close();
+  startSpill(id);
+}
+
+// ---------------------------------------------------------------------------
+// Start et spill
+// ---------------------------------------------------------------------------
+function startSpill(id) {
+  const spill = Lagring.hent(id);
+  if (!spill) { melding('Fant ikke spillet.'); return; }
+  t.id = id;
+  t.spill = spill;
+  t.verden = R.lagVerden(spill);
+  R.fyllOpp(spill, t.verden);   // lagringer fra før taket på tre av hver type
+  settSpillerfarge(spill.takfarge);
+  settNeon(t.verden.stil === 'neon');
+  document.body.classList.toggle('neon', neonPaa());
+  t.brett = new Brett(t.verden);
+  t.avdekkAnim.clear();
+  t.borstAnim.clear();
+  t.byggAnim.clear();
+  t.vist = { ...spill.forrad, mynter: spill.mynter };
+  t.solVis = 1 - spill.sol / SOL[spill.nivaa];
+  $('velg').hidden = true;
+  $('spill').hidden = false;
+  document.body.classList.toggle('liten', liten());
+  byggForrad();
+  oppdaterHud();
+  const k = t.kamera;
+  k.tilpassLerret();
+  const { bredde: B, hoyde: H, start } = t.verden;
+  k.grenser = { bredde: B * RUTE, hoyde: H * RUTE };
+  const kort = Math.min(k.lerret.width, k.lerret.height);
+  k.minSkala = kort / (Math.max(B, H) * RUTE * 1.05);
+  k.maksSkala = kort / (1.6 * RUTE);
+  k.sentrer((start.x + 0.5) * RUTE, (start.y + 0.5) * RUTE, kort / ((liten() ? 5.5 : 6.5) * RUTE));
+  t.skitten = true;
+  t.tur = null;
+  t.velkomst = null;
+  const nye = R.nyeHjelpere(spill);
+  if (nye.length) setTimeout(() => velkommenHjelper(nye), 900);
+  else if (spill.oppdrag.length || R.nesteRunde(spill, t.verden).length) setTimeout(startTur, 1200);
+  if (spill.stat.avdekket === 0) setTimeout(() => melding('Trykk på tåka for å børste den bort', { ikon: '👆☁️' }), 600);
+  if (spill.sol <= 0 && !spill.evigDag) setTimeout(startNatt, 500);
+}
+
+let lagreTid = 0;
+function lagreSnart() {
+  clearTimeout(lagreTid);
+  lagreTid = setTimeout(() => { if (t.id && t.spill) Lagring.lagre(t.id, t.spill); }, 400);
+}
+
+// ---------------------------------------------------------------------------
+// Trykk på brettet
+// ---------------------------------------------------------------------------
+function trykkPaa(kx, ky) {
+  if (t.naer || t.natt || !t.spill) return;
+  L.vekk();
+  const { bredde: B, hoyde: H } = t.verden;
+  const x = Math.floor(kx / RUTE), y = Math.floor(ky / RUTE);
+  if (x < 0 || y < 0 || x >= B || y >= H) return;
+  const i = y * B + x;
+  const s = t.spill, v = t.verden;
+  if (t.plasser) { plasserHer(i); return; }
+  const person = finnPerson(kx, ky);
+  if (naa() - t.lukketVed < 1000) {
+    // Dette trykket lukket en snakkeboble: det gjør ikke noe mer – med mindre man trykket på en annen person.
+    t.lukketVed = -Infinity;
+    if (person && personNokkel(person.hvem) !== t.lukketNokkel) snakkMed(person.hvem);
+    return;
+  }
+  if (person) { snakkMed(person.hvem); return; }
+  if (!s.avdekket[i]) {
+    behandle(R.borst(s, v, i), i);
+    return;
+  }
+  if (s.kryss.has(i)) { behandleGrav(R.grav(s, v, i), i); return; }
+  if (i === v.startIndeks) { aapneButikk(); return; }
+  if (s.bygg.get(i) === MUSEUM.id) { aapneMuseum(); return; }
+  if (s.bygg.get(i) === 'stavkirke') { aapneSangbok(); return; }   // sangboka ligger i stavkirka
+  if (s.bygg.has(i)) { aapneNaer(i, { pynt: R.pyntVed(s, i) }); return; }
+  if (R.tingVed(s, v, i)) { aapneNaer(i); return; }
+  const d = R.venterPaa(s, v, i);
+  if (d > 0) melding(d === Infinity ? 'Kista er tom.' : `Her vokser det noe nytt om ${d} ${d === 1 ? 'dag' : 'dager'}.`, { ikon: d === Infinity ? '📭' : '🌱' });
+}
+
+function midtAv(i) {
+  const B = t.verden.bredde;
+  return [(i % B + 0.5) * RUTE, (Math.floor(i / B) + 0.5) * RUTE];
+}
+
+function behandle(hendelser, i) {
+  stilleNyDag(hendelser);
+  for (const h of hendelser) {
+    if (h.type === 'borst' || h.type === 'avdekket') {
+      L.INSTRUMENT.sus(L.SANG.take.toner[h.nr]);
+      const [kx, ky] = midtAv(i);
+      sprut(kx, ky, { farger: ['#5a6372', '#7d8494', '#9aa1ae'], antall: 12, fart: 1.4 });
+      if (innst().visTall) flytendeTekst(kx, ky - 10, String(h.tall), { farge: '#ffe58a', varighet: 900 });
+      siTall(h.tall);
+      if (h.type === 'borst') t.borstAnim.set(i, naa());
+      else {
+        t.borstAnim.delete(i);
+        t.avdekkAnim.set(i, naa());
+        L.vend();
+        if (h.ting) setTimeout(() => sprut(kx, ky, { farger: ['#ffd23f', '#ffe58a', '#fff4c2'], antall: 16 }), 300);
+      }
+    } else if (h.type === 'tomSol') {
+      startNatt();
+    } else if (h.type === 'kveld') {
+      setTimeout(startNatt, 900);
+    }
+  }
+  oppdaterHud();
+  lagreSnart();
+  t.skitten = true;
+}
+
+/** Graving på et skattekryss: fire trykk (1, 2, 3, 4), så spretter kista fram. */
+const GRAVETONER = [261.63, 329.63, 392.0, 523.25];
+function behandleGrav(hendelser, i) {
+  stilleNyDag(hendelser);
+  const [kx, ky] = midtAv(i);
+  for (const h of hendelser) {
+    if (h.type === 'grav' || h.type === 'kisteFunnet') {
+      L.INSTRUMENT.hogg(GRAVETONER[h.tall - 1]);
+      sprut(kx, ky, { farger: ['#7a5236', '#a0703f', '#5b3a24'], antall: 14, fart: 1.5 });
+      if (innst().visTall) flytendeTekst(kx, ky - 10, String(h.tall), { farge: '#ffe58a', varighet: 900 });
+      siTall(h.tall);
+      t.borstAnim.set(i, naa());
+    }
+    if (h.type === 'kisteFunnet') {
+      t.byggAnim.set(i, naa());
+      setTimeout(() => { L.fanfare(1); sprut(kx, ky - 20, { farger: ['#ffd23f', '#ffe58a', '#fff4c2'], antall: 26, fart: 1.5 }); }, 150);
+      melding(liten() ? '🎁✨' : 'Du fant en skattekiste! Trykk på den og løs stykket.', { ikon: liten() ? '' : '🎁' });
+    } else if (h.type === 'tomSol') {
+      startNatt();
+    } else if (h.type === 'kveld') {
+      setTimeout(startNatt, 900);
+    }
+  }
+  oppdaterHud();
+  lagreSnart();
+  t.skitten = true;
+}
+
+// ---------------------------------------------------------------------------
+// Nærbilde: tingen stort på skjermen. Ett trykk = én tone og ett tall.
+// Kister åpnes med mattestykker; bygg man har satt ut, kan man glede seg over.
+// ---------------------------------------------------------------------------
+function aapneNaer(i, { pynt = null } = {}) {
+  const ting = pynt ? null : R.tingVed(t.spill, t.verden, i);
+  if (!ting && !pynt) return;
+  const kiste = ting?.type === 'kiste';
+  const boks = $('naer');
+  boks.classList.toggle('med-matte', kiste);
+  const liggende = innerWidth > innerHeight * 1.15;
+  // Ved kister trengs det plass til regnestykket: ved siden av (liggende) eller under (stående).
+  const panel = innst().svar === 'velg' ? 230 : 430;
+  const vedHavn = pynt === HAVN.id || pynt === BAAT.id;
+  const S = Math.floor(kiste
+    ? Math.max(130, Math.min(liggende ? innerWidth * 0.42 : innerWidth * 0.8, liggende ? innerHeight - 170 : innerHeight - panel - 130, 380))
+    : Math.min(innerWidth * 0.86, (innerHeight - (vedHavn ? 300 : 150)) * 0.86, 440));
+  const H = S + (pynt ? 0 : kiste ? 40 : 56);
+  const c = $('naer-lerret');
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(S * dpr);
+  c.height = Math.round(H * dpr);
+  c.style.width = `${S}px`;
+  c.style.height = `${H}px`;
+  const terreng = R.TERRENGNAVN[t.verden.terreng[i]];
+  t.naer = {
+    i, ting, pynt, S, H, tStart: naa() / 1000, tTrykk: -9, tFerdig: null, partikler: [], tall: 0, tTall: -9,
+    terreng: pynt && terreng === 'skog' ? 'eng' : terreng,
+    tilf: blandSeed(t.verden.seed, t.verden.forsok, 'kort', i),
+  };
+  if (pynt) {
+    $('naer-tittel').innerHTML = liten() ? '<span class="stor-ikon">🎉</span>' : esc(BYGG_ETTER_ID[pynt].navn);
+  } else {
+    const def = TING[ting.type];
+    $('naer-tittel').innerHTML = liten() ? `<span class="stor-ikon">${def.ikon}</span>`
+      : `${def.navn[ting.str]} <span class="sang">${kiste ? 'Løs stykket for å åpne!' : `♪ ${L.SANG[ting.sang].navn}`}</span>`;
+  }
+  $('matte').hidden = !kiste;
+  if (kiste) nyttStykke();
+  visHavnValg(pynt);
+  boks.hidden = false;
+}
+
+function trykkNaer(e) {
+  const n = t.naer;
+  if (!n || n.tFerdig !== null) return;
+  L.vekk();
+  const r = $('naer-lerret').getBoundingClientRect();
+  const x = e.clientX - r.left, y = Math.min(n.S * 0.95, e.clientY - r.top);
+  if (n.pynt) {
+    // Bygg man har satt ut: en liten fest når man trykker på dem.
+    n.tTrykk = naa() / 1000;
+    sprutNaer(n, x, y, 14, 1.2, ['#ffd23f', '#e0393e', '#3a74d8', '#25b86a', '#ffffff']);
+    L.fanfare(1);
+    return;
+  }
+  if (n.ting.type === 'kiste') return;   // kister åpnes med regnestykket under
+  const def = TING[n.ting.type];
+  const hendelser = R.trykkTing(t.spill, t.verden, n.i);
+  stilleNyDag(hendelser);
+  for (const h of hendelser) {
+    if (h.type === 'tone') {
+      L.INSTRUMENT[def.instrument](h.frekvens);
+      n.ting = { ...n.ting, igjen: h.igjen };
+      n.tTrykk = naa() / 1000;
+      n.tall = h.tall;
+      n.tTall = n.tTrykk;
+      siTall(h.tall);
+      sprutNaer(n, x, y, 7, 1);
+    } else if (h.type === 'ferdig') {
+      ferdigNaer(n, h, r);
+    } else if (h.type === 'kveld') {
+      n.kveld = true;
+      if (n.tFerdig === null) setTimeout(lukkNaer, 700);
+    } else if (h.type === 'tomSol') {
+      lukkNaer();
+    }
+  }
+  oppdaterHud();
+  lagreSnart();
+  t.skitten = true;
+}
+
+function ferdigNaer(n, h, r) {
+  n.tFerdig = naa() / 1000;
+  setTimeout(() => L.fanfare(n.ting.str + 1), 180);
+  sprutNaer(n, n.S / 2, n.S * 0.55, 12 + n.ting.str * 8, 1.4);
+  setTimeout(() => flyTil(h.gave, { x: r.left + r.width / 2, y: r.top + n.S / 2 }), 550);
+  // Melodiene samles i sangboka (i stavkirka): en ny melodi, eller hele melodien når en stor ting er ferdig.
+  if (h.helSang) setTimeout(() => melding(`Nå kan du hele «${L.SANG[h.sang].navn}»! Den ligger i sangboka.`, { ikon: '🎵🌟' }), 1300);
+  else if (h.nySang) setTimeout(() => melding(`Ny melodi i sangboka: ${L.SANG[h.sang].navn}!`, { ikon: '🎵✨' }), 1300);
+  if (n.ting.type === 'kiste') {
+    const verdi = Object.entries(h.gave).reduce((a, [v, k]) => a + VARER[v].pris * k, 0);
+    if (h.ny) {
+      // Et nytt slag! Det ropes opp, med stjerner for hvor sjeldent det er.
+      const grad = VARER[h.ny].grad;
+      setTimeout(() => L.fanfare(grad >= 3 ? 3 : 2), 1300);
+      setTimeout(() => melding(`Nytt funn: ${VARER[h.ny].navn}! ${'★'.repeat(grad)} ${SJELDENHET[grad].navn}. Skatten er verdt ${verdi} mynter.`,
+        { ikon: liten() ? `🆕${'★'.repeat(grad)}` : '🆕' }), 1500);
+    } else if (!liten()) setTimeout(() => melding(`Skatten er verdt ${verdi} mynter i butikken!`, { ikon: '💰' }), 1500);
+  }
+  setTimeout(lukkNaer, 2400);
+}
+
+function sprutNaer(n, x, y, antall, kraft, farger = null) {
+  const f = farger ?? TING[n.ting.type].sprut;
+  const t0 = naa() / 1000;
+  for (let i = 0; i < antall; i++) {
+    const v = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
+    const fart = (90 + Math.random() * 160) * kraft * (n.S / 230);
+    n.partikler.push({ x, y, vx: Math.cos(v) * fart, vy: Math.sin(v) * fart, t0, liv: 0.6 + Math.random() * 0.5,
+      r: (2 + Math.random() * 3.5) * (n.S / 230), farge: f[Math.floor(Math.random() * f.length)], spinn: Math.random() * 6 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Havna: bygg en seilbåt, og seil til en ny øy (eller bli der du er)
+// ---------------------------------------------------------------------------
+function visHavnValg(pynt) {
+  const el = $('havn-valg');
+  el.hidden = pynt !== HAVN.id && pynt !== BAAT.id;
+  if (el.hidden) return;
+  const s = t.spill;
+  if (pynt === HAVN.id) {
+    const pris = R.prisFor(s, BAAT.id), kan = s.mynter >= pris;
+    el.innerHTML = `${liten() ? '' : '<p>Bygg en seilbåt, så kan du seile til en ny øy!</p>'}
+      <button id="havn-baat" class="hoved${kan ? '' : ' dyr'}">⛵ ${liten() ? '' : 'Bygg seilbåt – '}${prisTekst(pris)}</button>
+      ${!kan && !liten() ? `<small>Du har ${s.mynter} mynter og mangler ${pris - s.mynter}.</small>` : ''}`;
+    $('havn-baat').onclick = byggBaat;
+  } else {
+    const ny = R.kanSeileNy(s), tilbake = R.kanSeileTilbake(s);
+    el.innerHTML = `${liten() ? '' : `<p>${ny ? 'Seilbåten er klar! Vil du seile til en ny øy? Øya du har bygget, blir liggende her, og du kan seile tilbake når du vil.'
+      : 'Seilbåten ligger klar ved brygga. I sjøkartet kan du seile til de andre øyene dine.'}</p>`}
+      <div class="havn-knapper">
+        ${ny ? `<button id="havn-seil" class="hoved">⛵ ${liten() ? '➡️ 🏝️' : 'Seil til en ny øy!'}</button>` : ''}
+        ${tilbake ? `<button id="havn-kart"${ny ? '' : ' class="hoved"'}>🗺️ ${liten() ? '' : 'Sjøkartet'}</button>` : ''}
+        <button id="havn-bli">${liten() ? '🏠' : '🏝️ Bli her litt til'}</button></div>`;
+    $('havn-seil')?.addEventListener('click', () => seilAvsted());
+    $('havn-kart')?.addEventListener('click', () => { lukkNaer(); aapneSjokart(); });
+    $('havn-bli').onclick = lukkNaer;
+  }
+}
+
+function byggBaat() {
+  L.vekk();
+  const h = R.byggBaat(t.spill);
+  if (h[0]?.type !== 'baatBygget') {
+    rist($('havn-valg'));
+    L.tomt();
+    if (h[0]?.type === 'forLiteMynter' && !liten()) melding(`Seilbåten koster ${R.prisFor(t.spill, BAAT.id)} mynter. Du mangler ${h[0].mangler}.`, { ikon: '🪙' });
+    return;
+  }
+  trekkVist('mynter', R.prisFor(t.spill, BAAT.id));
+  const n = t.naer;
+  n.pynt = BAAT.id;
+  n.tTrykk = naa() / 1000;
+  sprutNaer(n, n.S * 0.75, n.S * 0.55, 26, 1.3, ['#ffd23f', '#e0393e', '#3a74d8', '#25b86a', '#ffffff']);
+  L.fanfare(3);
+  $('naer-tittel').innerHTML = liten() ? '<span class="stor-ikon">⛵</span>' : esc(BAAT.navn);
+  visHavnValg(BAAT.id);
+  lagreSnart();
+  t.skitten = true;
+}
+
+/** Sjøkartet: alle øyene man har funnet. Man kan seile tilbake til dem når som helst. */
+function aapneSjokart() {
+  L.vekk();
+  const s = t.spill;
+  const oyer = R.oyListe(s);
+  $('sjokart-tekst').textContent = liten() ? ''
+    : R.kanSeileNy(s) ? 'Du kan også seile til en helt ny øy fra havna.'
+    : R.havnVed(s) < 0 && !oyer.some((o) => o.fra === s.oyNr) ? `Vil du finne en ny øy? Sett opp alle ${HAVN.krav} byggene og en havn på denne øya.` : '';
+  // Hele raden er en knapp: trykk hvor som helst på den for å seile dit. (Øya man står på, er ikke en knapp.)
+  $('oyliste').innerHTML = oyer.map((o) => {
+    const innhold = `<span class="oyikon">${o.ikon}</span>
+      <span class="oynavn"><b>${esc(o.navn)}</b><small>${o.bygg} bygg${o.her ? ' · Du er her' : ''}</small></span>
+      ${o.her ? '<span class="her-merke">📍</span>' : `<span class="seil-merke">⛵${liten() ? '' : ' Seil hit'}</span>`}`;
+    return o.her ? `<div class="oyrad her">${innhold}</div>` : `<button class="oyrad" data-oy="${o.nr}">${innhold}</button>`;
+  }).join('');
+  $('oyliste').querySelectorAll('[data-oy]').forEach((b) => { b.onclick = () => seilAvsted(Number(b.dataset.oy)); });
+  $('sjokart').showModal();
+}
+
+/** Seil til en ny øy (nr = null) eller tilbake til øy nummer nr. */
+function seilAvsted(nr = null) {
+  L.vekk();
+  const fraStil = t.verden.stil;
+  t.seiler = true;   // ingen natt mens man er på havet
+  if (t.naer) t.naer.kveld = false;
+  lukkNaer();
+  if ($('sjokart').open) $('sjokart').close();
+  avbrytPlassering();
+  const h = nr === null ? R.seil(t.spill) : R.seilTil(t.spill, nr);
+  if (h[0]?.type !== 'seilt') { t.seiler = false; return; }
+  Lagring.lagre(t.id, t.spill);
+  const { ny, stil } = h[0];
+  const navn = R.oyListe(t.spill).find((o) => o.her).navn;
+  const el = $('seiling');
+  el.classList.remove('ferdig');
+  $('seiling-tekst').textContent = liten() ? '⛵ ✨' : ny ? 'Seiler til en ny øy …' : `Seiler til ${navn} …`;
+  el.hidden = false;
+  L.fanfare(3);
+  // Filmen spilles over hele skjermen. Mot slutten lastes den nye øya inn bak den, og så tones filmen ut.
+  let lastet = false;
+  spillSeiltur($('seiling-lerret'), { fra: fraStil, til: stil }, (p) => {
+    if (!lastet && p > 0.88) { lastet = true; t.seiler = false; startSpill(t.id); }
+  }).then(() => {
+    el.classList.add('ferdig');
+    setTimeout(() => {
+      el.hidden = true;
+      el.classList.remove('ferdig');
+      const tekst = !ny ? `Velkommen tilbake til ${navn}!` : stil === 'neon' ? `Velkommen til ${navn}! Her lyser alt.` : 'Velkommen til en ny øy!';
+      melding(liten() ? `${R.oyListe(t.spill).find((o) => o.her).ikon}✨` : tekst, { ikon: liten() ? '' : '⛵✨' });
+    }, 700);
+  });
+}
+
+function lukkNaer() {
+  if (!t.naer) return;
+  const kveld = t.naer.kveld || (t.spill.sol <= 0 && !t.spill.evigDag);
+  t.naer = null;
+  $('naer').hidden = true;
+  t.skitten = true;
+  if (kveld) setTimeout(startNatt, 400);
+}
+
+function tegnNaer(tsek) {
+  const n = t.naer;
+  const c = $('naer-lerret');
+  const ctx = c.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const S = n.S;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, S, n.H);
+  const ting = n.ting;
+  const p = ting ? 1 - ting.igjen / ting.antall : 0;
+  const alder = tsek - n.tTrykk;
+  const ferdigT = n.tFerdig === null ? null : tsek - n.tFerdig;
+  const inn = sprett((tsek - n.tStart) / 0.35);
+  ctx.save();
+  ctx.translate(S / 2, S / 2);
+  ctx.scale(inn, inn);
+  ctx.translate(-S / 2, -S / 2);
+  tegnTomtKort(ctx, S, lagTilfeldig(n.tilf), n.terreng, () => {
+    const vugg = ferdigT === null ? Math.exp(-alder * 7) * Math.sin(alder * 38) * 0.07 : 0;
+    const klem = ferdigT === null ? Math.exp(-alder * 16) * 0.08 : 0;
+    ctx.save();
+    ctx.translate(S * 0.5, S * 0.86);
+    ctx.rotate(vugg);
+    ctx.scale(1 + klem * 0.6, 1 - klem);
+    ctx.translate(-S * 0.5, -S * 0.86);
+    if (n.pynt) {
+      // Bygget lever: et trykk gir ekstra fart en stund (og raketten skytes opp).
+      const fest = tsek - n.tTrykk;
+      n.tv = (n.tv ?? tsek) + Math.min(0.1, tsek - (n.sist ?? tsek)) * ivrig(fest);
+      n.sist = tsek;
+      PYNT[n.pynt](ctx, S, lagTilfeldig(blandSeed(t.verden.seed, 'pynt', n.i)));
+      LIV[n.pynt]?.(ctx, S, n.tv, fest);
+    }
+    else tegnFigur(ctx, S, ting, { p, ferdigT, t: tsek });
+    ctx.restore();
+  });
+  ctx.restore();
+  n.partikler = n.partikler.filter((q) => tsek - q.t0 < q.liv);
+  for (const q of n.partikler) {
+    const a = tsek - q.t0;
+    ctx.globalAlpha = 1 - a / q.liv;
+    ctx.fillStyle = q.farge;
+    ctx.save();
+    ctx.translate(q.x + q.vx * a, q.y + q.vy * a + 380 * (S / 230) * a * a);
+    ctx.rotate(q.spinn * a * 4);
+    ctx.fillRect(-q.r, -q.r * 0.6, q.r * 2, q.r * 1.2);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  if (!ting) return;
+  if (ting.type === 'kiste') { tegnPrikker(ctx, S, n.H - S, ting.antall, ting.antall - ting.igjen, false); return; }
+  tegnPrikker(ctx, S, n.H - S, ting.antall, ting.antall - ting.igjen, innst().visTall);
+  if (innst().visTall && n.tall > 0) tegnTeller(ctx, S, n, tsek);
+}
+
+/** Det store tallet øverst på kortet: 1, 2, 3 … opp til tallet som fjerner tingen. */
+function tegnTeller(ctx, S, n, tsek) {
+  const a = tsek - n.tTall;
+  const pop = 1 + 0.45 * Math.exp(-a * 9);
+  const ferdig = n.tall >= n.ting.antall;
+  ctx.save();
+  ctx.translate(S / 2, S * 0.16);
+  ctx.scale(pop, pop);
+  ctx.font = `900 ${Math.round(S * 0.17)}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = S * 0.025;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(30, 25, 15, 0.85)';
+  ctx.strokeText(String(n.tall), 0, 0);
+  ctx.fillStyle = ferdig ? '#ffd23f' : '#ffffff';
+  ctx.fillText(String(n.tall), 0, 0);
+  ctx.restore();
+  if (!liten()) {
+    ctx.font = `700 ${Math.round(S * 0.055)}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = S * 0.012;
+    ctx.strokeStyle = 'rgba(30, 25, 15, 0.8)';
+    const tekst = `av ${n.ting.antall}`;
+    ctx.strokeText(tekst, S / 2, S * 0.27);
+    ctx.fillStyle = '#ffe58a';
+    ctx.fillText(tekst, S / 2, S * 0.27);
+  }
+}
+
+/**
+ * Én prikk per trykk (eller per mattestykke). Fylte prikker = gjort.
+ * Med tall: fylte prikker viser tallet sitt, og den siste prikken viser målet.
+ */
+function tegnPrikker(ctx, S, H, n, gjort, medTall) {
+  const rader = n <= 12 ? 1 : Math.ceil(n / 15);
+  const perRad = Math.ceil(n / rader);
+  const r = Math.min(liten() || n <= 3 ? 13 : 10, (S - 8) / perRad / 2.6, (H - 6) / rader / 2.6);
+  const avst = r * 2.6;
+  const y0 = S + 4 + (H - 4 - rader * avst) / 2 + avst / 2;
+  const visTall = medTall && r >= 7.5;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.round(r * 1.05)}px system-ui, -apple-system, sans-serif`;
+  for (let i = 0; i < n; i++) {
+    const rad = Math.floor(i / perRad), kol = i - rad * perRad;
+    const iRad = Math.min(perRad, n - rad * perRad);
+    const x = S / 2 + (kol - (iRad - 1) / 2) * avst, y = y0 + rad * avst;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (i < gjort) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.fill();
+      if (visTall) { ctx.fillStyle = '#4a3410'; ctx.fillText(String(i + 1), x, y + 0.5); }
+    } else {
+      ctx.lineWidth = Math.max(1, r * 0.25);
+      ctx.strokeStyle = 'rgba(250, 242, 219, 0.5)';
+      ctx.stroke();
+      if (medTall && i === n - 1) {
+        ctx.font = `800 ${Math.round(Math.max(r * 1.05, 11))}px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = '#ffe58a';
+        ctx.fillText(String(n), x, y + 0.5);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mattestykker ved kistene
+// ---------------------------------------------------------------------------
+function nyttStykke() {
+  const n = t.naer;
+  // Stykket hører til kista: det er det samme hver gang man åpner den, til det er løst.
+  const o = R.stykkeFor(t.spill, t.verden, n.i, t.forrigeStykke);
+  lagreSnart();
+  t.forrigeStykke = o.tekst;
+  n.oppgave = o;
+  n.innTastet = '';
+  n.bommet = o.bommet;
+  $('matte-stykke').textContent = `${o.tekst} =`;
+  $('matte-melding').textContent = '';
+  $('matte-melding').className = 'matte-melding';
+  const velg = innst().svar === 'velg';
+  $('matte-valg').hidden = !velg;
+  $('matte-tast').hidden = velg;
+  if (velg) {
+    $('matte-valg').innerHTML = o.valg.map((v) => `<button type="button" class="svarvalg" data-v="${v}">${v}</button>`).join('');
+    $('matte-valg').querySelectorAll('button').forEach((b) => {
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); L.vekk(); svar(Number(b.dataset.v), b); });
+    });
+  }
+  visInntastet();
+}
+
+function visInntastet() {
+  const n = t.naer;
+  $('matte-svar').textContent = innst().svar === 'velg' ? '?' : (n.innTastet || '?');
+}
+
+function tastKiste(k) {
+  const n = t.naer;
+  if (!n?.oppgave || n.tFerdig !== null) return;
+  if (k === 'slett') n.innTastet = n.innTastet.slice(0, -1);
+  else if (k === 'ok') { if (n.innTastet === '') rist($('matte')); else svar(Number(n.innTastet)); return; }
+  else if (n.innTastet.length < 4) n.innTastet += k;
+  visInntastet();
+}
+
+function svar(verdi, knapp = null) {
+  const n = t.naer;
+  if (!n?.oppgave || n.tFerdig !== null || n.venter) return;
+  const o = n.oppgave;
+  const riktig = verdi === o.fasit;
+  const h = R.svarKiste(t.spill, t.verden, n.i, { riktig, forsteForsok: !n.bommet, art: o.art });
+  stilleNyDag(h);
+  lagreSnart();
+  if (!riktig) {
+    // Ingen straff: samme stykke står, og man prøver igjen.
+    n.bommet = true;
+    n.innTastet = '';
+    visInntastet();
+    $('matte-melding').textContent = liten() ? '🙈' : 'Ikke helt – prøv igjen!';
+    $('matte-melding').className = 'matte-melding feil';
+    if (knapp) knapp.classList.add('feil');
+    rist($('matte'));
+    L.tomt();
+    return;
+  }
+  $('matte-svar').textContent = String(o.fasit);
+  $('matte-melding').textContent = liten() ? '⭐' : 'Riktig!';
+  $('matte-melding').className = 'matte-melding riktig';
+  if (knapp) knapp.classList.add('riktig');
+  const r = $('naer-lerret').getBoundingClientRect();
+  for (const e of h) {
+    if (e.type === 'riktigSvar') {
+      // Hvert løste stykke spiller sin del av sangen.
+      const toner = n.ting.toner;
+      const del = Math.ceil(toner.length / n.ting.antall);
+      toner.slice((e.nr - 1) * del, e.nr * del).forEach((f, k) => setTimeout(() => L.INSTRUMENT.xylofon(f), k * 190));
+      n.ting = { ...n.ting, igjen: e.igjen };
+      n.tTrykk = naa() / 1000;
+      sprutNaer(n, n.S / 2, n.S * 0.55, 10, 1);
+    } else if (e.type === 'ferdig') {
+      setTimeout(() => ferdigNaer(n, e, r), 900);
+    } else if (e.type === 'kveld') {
+      n.kveld = true;
+    } else if (e.type === 'tomSol') {
+      lukkNaer();
+      return;
+    }
+  }
+  oppdaterHud();
+  t.skitten = true;
+  if (n.ting.igjen > 0) {
+    n.venter = true;
+    setTimeout(() => { n.venter = false; if (t.naer === n) nyttStykke(); }, 1100);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Forrådet: tingene flyr ned og teller først når de lander
+// ---------------------------------------------------------------------------
+// Det er for mange slag metaller og edelsteiner til at hvert kan ha sin egen rute nederst:
+// de samles i to ruter (alle metallene, alle edelsteinene). I butikken og museet står de hver for seg.
+const FORRAD_REKKE = ['mynter', ...RAVARER, 'stov', 'metaller', 'steiner'];
+const GRUPPE = { metaller: METALLER, steiner: EDELSTEINER };
+const GRUPPE_NAVN = { mynter: 'mynter', metaller: 'metaller', steiner: 'edelsteiner' };
+const GRUPPE_IKON = { metaller: 'gull', steiner: 'diamant' };
+const plassFor = (vare) => (METALLER.includes(vare) ? 'metaller' : EDELSTEINER.includes(vare) ? 'steiner' : vare);
+const vistI = (v) => (GRUPPE[v] ? GRUPPE[v].reduce((a, x) => a + (t.vist[x] ?? 0), 0) : t.vist[v] ?? 0);
+
+function byggForrad() {
+  $('forrad').innerHTML = FORRAD_REKKE.map((v) =>
+    `<span class="vare${v === 'mynter' ? ' mynter' : ''}" id="f-${v}" title="${GRUPPE_NAVN[v] ?? VARER[v].navn}"></span>`).join('');
+  tegnForrad();
+}
+
+function tegnForrad(dunk) {
+  for (const v of FORRAD_REKKE) {
+    const el = $(`f-${v}`), n = vistI(v), bilde = ikon(GRUPPE_IKON[v] ?? v);
+    // Skatter vises først når man har funnet noen (bortsett fra mynter).
+    el.hidden = (v === 'stov' || !!GRUPPE[v]) && !n;
+    el.classList.toggle('null', !n);
+    el.innerHTML = liten() && v !== 'mynter'
+      ? (n ? `${bilde.repeat(Math.min(n, 5))}${n > 5 ? '<small>+</small>' : ''}` : bilde)
+      : `${bilde} <b>${n}</b>`;
+  }
+  if (dunk) {
+    const el = $(`f-${dunk}`);
+    el.classList.remove('dunk');
+    void el.offsetWidth;
+    el.classList.add('dunk');
+  }
+}
+
+/** Ting flyr fra et punkt ned i forrådet. Mange av samme slag deles på opptil 10 flygere. */
+function flyTil(gave, fra) {
+  let forsink = 0;
+  for (const [vare, n] of Object.entries(gave)) {
+    if (!n) continue;
+    const flygere = Math.min(n, 10);
+    for (let k = 0; k < flygere; k++) {
+      const andel = Math.floor(n / flygere) + (k < n % flygere ? 1 : 0);
+      const plass = plassFor(vare);
+      $(`f-${plass}`).hidden = false;
+      const s = document.createElement('span');
+      s.className = 'flyr';
+      s.innerHTML = ikon(vare);
+      s.style.left = `${fra.x}px`;
+      s.style.top = `${fra.y}px`;
+      document.body.append(s);
+      const m = $(`f-${plass}`).getBoundingClientRect();
+      const dx = m.left + m.width / 2 - fra.x, dy = m.top + m.height / 2 - fra.y;
+      setTimeout(() => { s.style.transform = `translate(${dx}px, ${dy}px) scale(0.6)`; }, 40 + forsink);
+      setTimeout(() => {
+        s.remove();
+        t.vist[vare] = (t.vist[vare] ?? 0) + andel;
+        tegnForrad(plass);
+        if (vare === 'mynter') oppdaterButikkMynter();
+      }, 900 + forsink);
+      forsink += flygere > 6 ? 70 : 110;
+    }
+  }
+}
+
+/** Tar vekk fra visningen med en gang (det man selger eller betaler). */
+function trekkVist(vare, n) {
+  t.vist[vare] = Math.max(0, (t.vist[vare] ?? 0) - n);
+  tegnForrad();
+}
+
+// ---------------------------------------------------------------------------
+// Butikken: selg skatter og råvarer, kjøp bygg
+// ---------------------------------------------------------------------------
+let fane = 'selg';
+const bildeLager = new Map();
+
+function byggBilde(id) {
+  const nokkel = `${id}|${neonPaa()}|${spillerfarge()}`;
+  if (bildeLager.has(nokkel)) return bildeLager.get(nokkel);
+  const S = 120, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const c = document.createElement('canvas');
+  c.width = c.height = S * dpr;
+  const ctx = neonKontekst(c.getContext('2d'));
+  ctx.scale(dpr, dpr);
+  tegnTomtKort(ctx, S, lagTilfeldig(blandSeed('butikk', id)), ['iglo', 'snomann', HAVN.id, BAAT.id].includes(id) ? 'strand' : 'eng',
+    () => tegnBygg(ctx, S, id, lagTilfeldig(blandSeed('butikk-pynt', id))));
+  glod(c, 0.5);
+  const url = c.toDataURL();
+  bildeLager.set(nokkel, url);
+  return url;
+}
+
+function aapneButikk(f = fane) {
+  L.vekk();
+  fane = f;
+  tegnButikk();
+  if (!$('butikk').open) $('butikk').showModal();
+}
+
+function oppdaterButikkMynter(alltid = false) {
+  if (!alltid && !$('butikk').open) return;
+  $('butikk-mynter').innerHTML = `🪙 <b>${t.vist.mynter ?? 0}</b>${liten() ? '' : ' mynter'}${t.spill?.kreativ ? ' · <span class="kreativ-merke">🎨 Kreativmodus: alle bygg er gratis</span>' : ''}`;
+}
+
+function tegnButikk() {
+  const s = t.spill;
+  $('fane-selg').classList.toggle('valgt', fane === 'selg');
+  $('fane-kjop').classList.toggle('valgt', fane === 'kjop');
+  $('butikk-selg').hidden = fane !== 'selg';
+  $('butikk-kjop').hidden = fane !== 'kjop';
+  oppdaterButikkMynter(true);
+  tegnTakfarger();
+  if (fane === 'selg') {
+    const varer = [...SKATTER, ...RAVARER].filter((v) => s.forrad[v] > 0);
+    const skattVerdi = SKATTER.reduce((a, v) => a + s.forrad[v] * VARER[v].pris, 0);
+    $('butikk-selg').innerHTML = varer.length
+      ? `${skattVerdi ? `<button class="hoved selg-alle" id="selg-skatter">💰 Selg alle skattene${liten() ? '' : ` (${skattVerdi} mynter)`}</button>` : ''}
+        <div class="selgliste">${varer.map((v) => {
+          const n = s.forrad[v], p = VARER[v].pris;
+          return `<div class="selgrad"><span class="vi">${ikon(v)}</span>
+            <span class="vn">${liten() ? '' : `<b>${VARER[v].navn}</b><small>${n} × ${p} = ${n * p} 🪙${VARER[v].grad ? ` · <span class="grad">${'★'.repeat(VARER[v].grad)} ${SJELDENHET[VARER[v].grad].navn}</span>` : ''}</small>`}</span>
+            <button data-selg="${v}">${liten() ? `${'🪙'.repeat(Math.min(3, Math.ceil(n * p / 20)))}` : `Selg for ${n * p} 🪙`}</button></div>`;
+        }).join('')}</div>${museumHint()}`
+      : `<p class="tom-tekst">${liten() ? '🌳 🪨 🎁' : 'Du har ingenting å selge ennå. Trykk på ting på øya og åpne kister!'}</p>`;
+    $('butikk-selg').querySelectorAll('[data-selg]').forEach((b) => { b.onclick = () => selgVare([b.dataset.selg], b); });
+    $('selg-skatter')?.addEventListener('click', (e) => selgVare(SKATTER.filter((v) => s.forrad[v] > 0), e.currentTarget));
+  } else {
+    $('butikk-kjop').innerHTML = museumKort() + BYGG.map(kortFor).join('') + havnKort() + skoleKort() + oppfinnelseKort();
+    $('butikk-kjop').querySelectorAll('[data-bygg]').forEach((b) => { b.onclick = () => velgBygg(b.dataset.bygg); });
+  }
+}
+
+/** Prisen slik den står i butikken (gratis i kreativmodus). */
+const prisTekst = (pris) => (pris ? `${pris} 🪙` : 'Gratis');
+
+/** Et vanlig kort i butikken: bilde, navn, pris og hvor mye man mangler. */
+function kortFor(b) {
+  const s = t.spill;
+  const pris = R.prisFor(s, b.id), kan = s.mynter >= pris;
+  return `<button class="byggkort${kan ? '' : ' dyr'}" data-bygg="${b.id}">
+    <img src="${byggBilde(b.id)}" alt=""><span class="bn">${esc(b.navn)}</span>
+    <span class="bp">${prisTekst(pris)}</span>${!kan && !liten() ? `<span class="bm">mangler ${pris - s.mynter}</span>` : ''}${b.id === 'stavkirke' ? `<span class="bl">🎵${liten() ? '' : ' Her ligger sangboka'}</span>` : ''}</button>`;
+}
+
+/** Museet: gratis, ett per øy. Det står først i butikken og ser ut som de andre byggene. */
+function museumKort() {
+  const s = t.spill, staar = R.museumVed(s) >= 0;
+  return `<button class="byggkort${staar ? ' laast' : ''}" data-bygg="${MUSEUM.id}">
+    <img src="${byggBilde(MUSEUM.id)}" alt=""><span class="bn">${esc(MUSEUM.navn)}</span>
+    <span class="bp">${prisTekst(R.prisFor(s, MUSEUM.id))}</span>${staar ? `<span class="bl">${liten() ? '✔️' : '✔️ Står på øya'}</span>` : ''}</button>`;
+}
+
+/** Under salgslista: skattene man selger, havner i museet. */
+function museumHint() {
+  if (liten()) return '';
+  return `<p class="museum-hint">🏛️ ${R.museumVed(t.spill) >= 0 ? 'Skattene du selger, blir stilt ut i museet.'
+    : 'Skattene du selger, blir tatt vare på. Bygg et museum (det er gratis), så får du se dem!'}</p>`;
+}
+
+/** Skolen: et spesielt bygg, ett per øy. */
+function skoleKort() {
+  const s = t.spill, staar = R.skoleVed(s) >= 0;
+  return `<button class="byggkort skole${staar ? ' laast' : s.mynter < R.prisFor(s, SKOLE.id) ? ' dyr' : ''}" data-bygg="${SKOLE.id}">
+    <img src="${byggBilde(SKOLE.id)}" alt=""><span class="bn">🏫 ${esc(SKOLE.navn)}</span>
+    <span class="bp">${prisTekst(R.prisFor(s, SKOLE.id))}</span><span class="bl">${staar ? (liten() ? '✔️' : '✔️ Står på øya') : (liten() ? '💡' : `${esc(oppfinner())} finner på nye ting`)}</span></button>`;
+}
+
+/** Det barnet på skolen har funnet på, og et spørsmålstegn for neste idé. */
+function oppfinnelseKort() {
+  const s = t.spill;
+  const funnet = OPPFINNELSER.filter((o) => R.harOppfinnelse(s, o.id));
+  const tenker = R.tenkerPaaIde(s) && !s.kreativ;
+  if (!funnet.length && !tenker) return '';
+  const antall = s.kreativ ? 'alle låst opp i kreativmodus' : `${funnet.length} av ${OPPFINNELSER.length}`;
+  return `<div class="butikk-overskrift">💡 ${liten() ? '' : `${esc(eierform(oppfinner()))} oppfinnelser (${antall})`}</div>`
+    + funnet.map(kortFor).join('')
+    + (tenker ? `<div class="byggkort hemmelig"><span class="sporsmal">💡❓</span>
+      <span class="bl">${liten() ? '' : `${esc(oppfinner())} tenker på noe nytt …`}</span></div>` : '');
+}
+
+/** Havna nederst i butikken: låst til alle de 20 ulike byggene står på øya. */
+function havnKort() {
+  const s = t.spill;
+  const har = R.ulikeBygg(s);
+  const laast = !R.havnApen(s), staar = R.havnVed(s) >= 0;
+  const status = staar ? (liten() ? '✔️' : '✔️ Står på øya')
+    : laast ? (liten() ? `🔒 ${har}/${HAVN.krav}` : `🔒 ${har} av ${HAVN.krav} ulike bygg`)
+    : (liten() ? '⚓' : 'Settes ved sjøen');
+  return `<button class="byggkort havn${laast || staar ? ' laast' : ''}${!laast && !staar && s.mynter < R.prisFor(s, HAVN.id) ? ' dyr' : ''}" data-bygg="${HAVN.id}">
+    <img src="${byggBilde(HAVN.id)}" alt=""><span class="bn">⚓ ${esc(HAVN.navn)}</span>
+    <span class="bp">${prisTekst(R.prisFor(s, HAVN.id))}</span><span class="bl">${status}</span></button>`;
+}
+
+/** Fargevelgeren nederst i butikken: taket på leiren og alle flaggene. */
+function tegnTakfarger() {
+  const valgt = t.spill.takfarge ?? STANDARD_TAKFARGE;
+  $('takfarge-tekst').textContent = liten() ? '🎨' : '🎨 Farge på taket og flaggene';
+  $('takfarger').innerHTML = TAKFARGER.map((f) => `<button class="${f.farge === valgt ? 'valgt' : ''}" data-farge="${f.farge}"
+    style="background:${f.farge}" aria-label="${f.navn}" title="${f.navn}"></button>`).join('');
+  $('takfarger').querySelectorAll('[data-farge]').forEach((b) => { b.onclick = () => velgTakfarge(b.dataset.farge); });
+}
+
+function velgTakfarge(farge) {
+  L.vekk();
+  t.spill.takfarge = farge;
+  settSpillerfarge(farge);
+  L.INSTRUMENT.xylofon(659.25);
+  lagreSnart();
+  t.skitten = true;
+  tegnButikk();   // bildene i butikken får de nye flaggene
+}
+
+function selgVare(varer, knapp) {
+  const r = knapp.getBoundingClientRect();
+  let sum = 0;
+  for (const v of varer) {
+    const n = t.spill.forrad[v];
+    for (const h of R.selg(t.spill, v)) { sum += h.sum; trekkVist(v, n); }
+  }
+  if (!sum) return;
+  L.INSTRUMENT.xylofon(523.25);
+  setTimeout(() => L.INSTRUMENT.xylofon(783.99), 120);
+  flyTil({ mynter: sum }, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  lagreSnart();
+  setTimeout(tegnButikk, 50);
+}
+
+function velgBygg(id) {
+  const b = BYGG_ETTER_ID[id];
+  if (id === HAVN.id && !R.kanKjopeHavn(t.spill)) {
+    rist($('butikk'));
+    L.tomt();
+    const staar = R.havnVed(t.spill) >= 0;
+    if (!liten()) {
+      melding(staar ? 'Havna står allerede på øya. Trykk på den for å bygge en seilbåt.'
+        : `Havna kan bygges når alle de ${HAVN.krav} ulike byggene står på øya. Du har ${R.ulikeBygg(t.spill)}.`, { ikon: '⚓' });
+    }
+    return;
+  }
+  if (id === MUSEUM.id && R.museumVed(t.spill) >= 0) {
+    rist($('butikk'));
+    L.tomt();
+    if (!liten()) melding('Museet står allerede på øya. Trykk på det for å gå inn.', { ikon: '🏛️' });
+    return;
+  }
+  if (id === SKOLE.id && R.skoleVed(t.spill) >= 0) {
+    rist($('butikk'));
+    L.tomt();
+    if (!liten()) melding(`Det står allerede en skole på øya. ${oppfinner()} går rundt der og tenker.`, { ikon: '🏫' });
+    return;
+  }
+  const pris = R.prisFor(t.spill, id);
+  if (t.spill.mynter < pris) {
+    rist($('butikk'));
+    L.tomt();
+    if (!liten()) melding(`Du har ${t.spill.mynter} mynter. ${b.navn} koster ${pris}, så du mangler ${pris - t.spill.mynter}.`, { ikon: '🪙' });
+    return;
+  }
+  $('butikk').close();
+  t.plasser = { id };
+  $('plasser-tekst').innerHTML = liten() ? `<img src="${byggBilde(id)}" alt=""> 👇`
+    : id === HAVN.id ? 'Trykk på en rute ved sjøen for å bygge <b>havna</b>' : `Trykk der du vil sette opp: <b>${esc(b.navn)}</b>`;
+  $('plasser').hidden = false;
+  t.skitten = true;
+}
+
+function plasserHer(i) {
+  const { id } = t.plasser;
+  const pris = R.prisFor(t.spill, id);
+  const for_ = R.ulikeBygg(t.spill);
+  const h = R.kjopOgPlasser(t.spill, t.verden, i, id);
+  if (h[0]?.type !== 'bygget') {
+    L.tomt();
+    melding(h[0]?.type === 'forLiteMynter' ? 'Du har ikke nok mynter.'
+      : id === HAVN.id ? 'Havna må stå på land, rett ved sjøen. Velg en rute med ring rundt.'
+      : 'Her kan du ikke bygge. Velg en ledig rute med ring rundt.', { ikon: '🚫' });
+    return;
+  }
+  if (for_ < HAVN.krav && R.ulikeBygg(t.spill) >= HAVN.krav) {
+    setTimeout(() => {
+      L.fanfare(3);
+      melding(liten() ? '⚓🎉' : `Alle ${HAVN.krav} byggene står på øya! Nå kan du kjøpe en havn i butikken.`, { ikon: liten() ? '' : '⚓🎉' });
+    }, 2200);
+  }
+  if (id === HAVN.id) setTimeout(() => melding(liten() ? '⛵❓' : 'Trykk på havna for å bygge en seilbåt.', { ikon: '⛵' }), 2200);
+  if (id === MUSEUM.id) setTimeout(() => melding(liten() ? '🏛️👆' : 'Trykk på museet for å gå inn og se skattene du har solgt.', { ikon: '🏛️' }), 2200);
+  const nyeHjelpere = h.filter((e) => e.type === 'nyHjelper');
+  if (nyeHjelpere.length) setTimeout(() => velkommenHjelper(nyeHjelpere), 2400);
+  trekkVist('mynter', pris);
+  t.byggAnim.set(i, naa());
+  const [kx, ky] = midtAv(i);
+  sprut(kx, ky, { farger: ['#c8a26b', '#e3cfa1', '#8a6a3c'], antall: 22, fart: 1.6 });
+  setTimeout(() => sprut(kx, ky - 30, { farger: ['#ffd23f', '#e0393e', '#3a74d8', '#25b86a'], antall: 24, fart: 1.4 }), 350);
+  L.fanfare(2);
+  melding(`${BYGG_ETTER_ID[id].navn} står ferdig!`, { ikon: '🎉' });
+  avbrytPlassering();
+  lagreSnart();
+}
+
+function avbrytPlassering() {
+  t.plasser = null;
+  $('plasser').hidden = true;
+  t.skitten = true;
+}
+
+// ---------------------------------------------------------------------------
+// Foreldrekontroll (bak et regnestykke for voksne)
+// ---------------------------------------------------------------------------
+// Porten: første gang løser man et voksent gangestykke og lager en firesifret kode.
+// Etter det kreves koden. Har man glemt den, kan man lage en ny etter et vanskeligere stykke.
+let port = null;
+const PORTTEKST = {
+  matte: 'Løs stykket for å komme til foreldrekontrollen:',
+  ny1: 'Lag en firesifret foreldrekode. Den trengs hver gang du skal inn hit.',
+  ny2: 'Skriv den samme koden én gang til:',
+  kode: 'Skriv foreldrekoden:',
+  glemt: 'Glemt koden? Løs stykket, så kan du lage en ny kode:',
+};
+const tilfeldig = (n) => Math.floor(Math.random() * n);
+const kodeModus = () => port && port.modus !== 'matte' && port.modus !== 'glemt';
+
+/** Åpner porten. maal kalles når man er sluppet inn. */
+function aapnePort(maal, modus = null) {
+  if ($('meny').open) $('meny').close();
+  port = { maal, inn: '' };
+  settPort(modus ?? (Lagring.hentKode() ? 'kode' : 'matte'));
+  if (!$('port').open) $('port').showModal();
+}
+
+function settPort(modus, tekst = '') {
+  port.modus = modus;
+  port.inn = '';
+  port.stykke = '';
+  if (modus === 'matte' || modus === 'glemt') {
+    const a = modus === 'matte' ? 6 + tilfeldig(4) : 13 + tilfeldig(37), b = 6 + tilfeldig(4);
+    port.fasit = a * b;
+    port.stykke = `${a} × ${b} =`;
+  }
+  $('port-tekst').textContent = PORTTEKST[modus];
+  $('port-melding').textContent = tekst;
+  $('port-glemt').hidden = modus !== 'kode';
+  visPort();
+}
+
+function visPort() {
+  const kode = kodeModus();
+  $('port-stykke').textContent = port.stykke;
+  $('port-svar').textContent = kode ? [0, 1, 2, 3].map((i) => (i < port.inn.length ? '●' : '○')).join('') : (port.inn || '?');
+  $('port-svar').classList.toggle('kode', kode);
+}
+
+function slippInn() {
+  const { maal } = port;
+  port = null;
+  $('port').close();
+  maal();
+}
+
+function tastPort(k) {
+  if (!port) return;
+  if (k === 'slett') port.inn = port.inn.slice(0, -1);
+  else if (k === 'ok') { if (port.inn) sjekkPort(); else rist($('port')); return; }
+  else if (port.inn.length < 4) port.inn += k;
+  visPort();
+  // Koden sjekkes av seg selv når fire sifre er skrevet.
+  if (kodeModus() && port.inn.length === 4) setTimeout(sjekkPort, 180);
+}
+
+function sjekkPort() {
+  if (!port) return;
+  const { modus, inn } = port;
+  if (modus === 'matte' || modus === 'glemt') {
+    if (Number(inn) === port.fasit) settPort('ny1');
+    else { rist($('port')); port.inn = ''; visPort(); }
+  } else if (inn.length !== 4) {
+    rist($('port'));
+  } else if (modus === 'ny1') {
+    port.forste = inn;
+    settPort('ny2');
+  } else if (modus === 'ny2') {
+    if (inn === port.forste) {
+      Lagring.lagreKode(inn);
+      melding('Foreldrekoden er lagret. Husk den!', { ikon: '🔑' });
+      slippInn();
+    } else {
+      rist($('port'));
+      settPort('ny1', 'Kodene var ikke like. Prøv igjen.');
+    }
+  } else if (modus === 'kode') {
+    if (inn === Lagring.hentKode()) slippInn();
+    else { rist($('port')); settPort('kode', 'Feil kode. Prøv igjen.'); }
+  }
+}
+
+/** Foreldrene: alle spillerne på enheten, med mulighet til å fjerne dem. */
+function aapneSpillere() {
+  const liste = Lagring.profiler();
+  $('spillerliste').innerHTML = liste.length ? liste.map((p) => `<div class="spillerrad">
+      <span class="ava">${esc(p.avatar)}</span>
+      <span class="sn"><b>${esc(p.navn)}</b><small>${NIVAA[p.nivaa]?.ikon ?? ''} Dag ${p.dag}${p.id === t.id ? ' · spiller nå' : ''}</small></span>
+      <button data-fjern="${esc(p.id)}">🗑️ Fjern</button></div>`).join('')
+    : '<p class="midt forklaring">Ingen spillere ennå.</p>';
+  $('spillerliste').querySelectorAll('[data-fjern]').forEach((b) => { b.onclick = () => fjernSpiller(b.dataset.fjern); });
+  if (!$('spillere').open) $('spillere').showModal();
+}
+
+function fjernSpiller(id) {
+  const p = Lagring.profiler().find((q) => q.id === id);
+  if (!p || !confirm(`Fjerne ${p.navn}? Øya og alt ${p.navn} har samlet, blir slettet. Dette kan ikke angres.`)) return;
+  if (id === t.id) {
+    // Spilleren som er i gang: tilbake til valg av spiller.
+    t.id = null;
+    t.spill = null;
+    Lagring.slett(id);
+    $('spillere').close();
+    visVelg();
+    return;
+  }
+  Lagring.slett(id);
+  aapneSpillere();
+  if (!$('velg').hidden) visVelg();
+}
+
+function aapneForeldre() {
+  $('foreldre-navn').textContent = t.spill.navn;
+  tegnForeldre();
+  $('foreldre').showModal();
+}
+
+/** Statistikkpanelet i foreldrekontrollen: matte, spilling og det som har skjedd på øya. */
+function statistikkHtml(s) {
+  const st = s.stat, ms = s.mattestat;
+  const pst = (a, b) => (b ? `${Math.round((a / b) * 100)} %` : '–');
+  const tall = (n) => Number(n || 0).toLocaleString('nb-NO');
+  const tid = (sek) => {
+    const min = Math.floor((sek || 0) / 60), timer = Math.floor(min / 60);
+    return timer ? `${timer} t ${min % 60} min` : `${min} min`;
+  };
+  const rute = (verdi, tekst) => `<div class="stat-rute"><b>${verdi}</b><small>${tekst}</small></div>`;
+  const svar = ms.lost + ms.feil;
+  const arter = Object.entries(ms.perArt).filter(([, v]) => v.lost);
+  const sanger = L.SANGER.filter((id) => (s.sanger[id] ?? 0) >= 3).length, funnet = L.SANGER.filter((id) => (s.sanger[id] ?? 0) > 0).length;
+  const alleOyer = R.oyListe(s).length;
+  return `
+    <div class="stat-gruppe"><h3>🧮 Matte i kistene</h3><div class="stat-ruter">
+      ${rute(tall(ms.lost), 'regnestykker løst')}
+      ${rute(pst(ms.forste, ms.lost), 'riktig på første forsøk')}
+      ${rute(pst(ms.lost, svar), `riktige av alle svar (${tall(svar)} svar, ${tall(ms.feil)} feil)`)}
+      ${rute(tall(st.kister), 'kister åpnet')}
+      ${rute(`${s.kjent.length} / ${METALLER.length + EDELSTEINER.length}`, 'slag metaller og edelsteiner funnet')}
+    </div>
+    ${arter.length ? `<table class="stat-arter"><tr><th>Regneart</th><th>Løst</th><th>Første forsøk</th><th>Feil svar</th></tr>
+      ${arter.map(([a, v]) => `<tr><td>${M.ARTNAVN[a]} (${M.TEGN[a]})</td><td>${tall(v.lost)}</td><td>${pst(v.forste, v.lost)}</td><td>${tall(v.feil ?? 0)}</td></tr>`).join('')}</table>` : ''}
+    </div>
+    <div class="stat-gruppe"><h3>🎮 Spilling</h3><div class="stat-ruter">
+      ${rute(tall(st.klikk), 'trykk totalt i spillet')}
+      ${rute(tid(st.sekunder), 'tid i spillet')}
+      ${rute(tall(s.dag), s.dag === 1 ? 'dag' : 'dager')}
+      ${rute(tall(st.trykk), 'trykk som brukte sol')}
+    </div></div>
+    <div class="stat-gruppe"><h3>🏝️ På øya</h3><div class="stat-ruter">
+      ${rute(tall(st.avdekket), 'ruter avdekket')}
+      ${rute(tall(st.ting), 'ting samlet inn')}
+      ${rute(tall(st.gravd), 'skattekryss gravd fram')}
+      ${rute(tall(st.stjerner), 'stjerneskudd fanget')}
+      ${rute(tall(st.bygg), 'bygg satt opp')}
+      ${rute(tall(st.tjent), `mynter tjent (${tall(s.mynter)} nå)`)}
+      ${rute(`${s.hjelpere.length} / ${HJELPER.maks}`, `hjelpere (har samlet ${tall(st.hjulpet)} ting)`)}
+      ${rute(`${funnet} / ${L.SANGER.length}`, `melodier funnet (${sanger} lært helt)`)}
+      ${rute(`${s.oppfinnelser.length} / ${OPPFINNELSER.length}`, 'oppfinnelser fra skolen')}
+      ${rute(tall(st.lyttet), 'tekster læreren har lest')}
+      ${rute(tall(R.iMuseet(s)), `skatter i museet (${R.slagIMuseet(s)} av ${SKATTER.length} slag)`)}
+      ${rute(tall(alleOyer), alleOyer === 1 ? 'øy' : 'øyer funnet')}
+    </div></div>`;
+}
+
+function tegnForeldre() {
+  const f = innst();
+  $('f-hurtig').innerHTML = Object.entries(M.FORHANDSVALG).map(([k, v]) => `<button data-hurtig="${k}">${v.navn}</button>`).join('');
+  $('f-arter').innerHTML = Object.keys(M.TEGN).map((art) => `
+    <div class="artrad">
+      <button class="bryter${f[art].paa ? ' paa' : ''}" data-art="${art}">${f[art].paa ? '✓' : ''} ${M.ARTNAVN[art]} (${M.TEGN[art]})</button>
+      <span class="tak">${art === 'pluss' || art === 'minus' ? 'tall opp til' : 'tabell opp til'}</span>
+      <span class="valgrad liten">${M.TAK_VALG[art].map((v) => `<button class="${f[art].tak === v ? 'valgt' : ''}" data-art="${art}" data-tak="${v}">${v}</button>`).join('')}</span>
+      ${art === 'gange' ? `<span class="tak">· av og til × 0${f.gange.tak < 10 ? ' og × 10' : ''}</span>` : ''}
+    </div>`).join('');
+  $('f-svar').innerHTML = [['velg', 'Velg blant tre svar'], ['tastatur', 'Skriv svaret selv']]
+    .map(([k, n]) => `<button class="${f.svar === k ? 'valgt' : ''}" data-svar="${k}">${n}</button>`).join('');
+  $('f-telling').innerHTML = `
+    <button class="bryter${f.visTall ? ' paa' : ''}" data-flagg="visTall">${f.visTall ? '✓' : ''} Vis tallene når man trykker</button>
+    <button class="bryter${f.lesOpp ? ' paa' : ''}" data-flagg="lesOpp">${f.lesOpp ? '✓' : ''} Les tallene høyt</button>`;
+  $('f-stat').innerHTML = statistikkHtml(t.spill);
+  const prov = M.lagOppgave(f);
+  $('f-eksempel').textContent = `Eksempel: ${prov.tekst} = ${prov.fasit}`;
+
+  const endre = (fn) => { fn(f); t.spill.foreldre = M.medStandard(f); lagreSnart(); tegnForeldre(); };
+  $('f-hurtig').querySelectorAll('[data-hurtig]').forEach((b) => {
+    b.onclick = () => endre((ff) => { const v = M.FORHANDSVALG[b.dataset.hurtig]; for (const a of Object.keys(M.TEGN)) ff[a] = { ...v[a] }; ff.svar = v.svar; });
+  });
+  $('f-arter').querySelectorAll('.bryter[data-art]').forEach((b) => {
+    b.onclick = () => endre((ff) => {
+      ff[b.dataset.art].paa = !ff[b.dataset.art].paa;
+      if (!Object.keys(M.TEGN).some((a) => ff[a].paa)) ff.pluss.paa = true;   // minst én regneart
+    });
+  });
+  $('f-arter').querySelectorAll('[data-tak]').forEach((b) => {
+    b.onclick = () => endre((ff) => { ff[b.dataset.art].tak = Number(b.dataset.tak); ff[b.dataset.art].paa = true; });
+  });
+  $('f-svar').querySelectorAll('[data-svar]').forEach((b) => { b.onclick = () => endre((ff) => { ff.svar = b.dataset.svar; }); });
+  $('f-telling').querySelectorAll('[data-flagg]').forEach((b) => {
+    b.onclick = () => endre((ff) => { ff[b.dataset.flagg] = !ff[b.dataset.flagg]; });
+  });
+  const k = t.spill.kreativ;
+  $('f-kreativ').innerHTML = `<button class="bryter${k ? ' paa' : ''}" id="kreativ-bryter">${k ? '✓' : ''} 🎨 Kreativmodus</button>
+    <small>Alle bygg (og seilbåten) er gratis, og alle oppfinnelsene er låst opp – nyttig for å prøve nye ting raskt.</small>`;
+  $('kreativ-bryter').onclick = () => { t.spill.kreativ = !t.spill.kreativ; lagreSnart(); tegnForeldre(); };
+}
+
+// ---------------------------------------------------------------------------
+// Toppen: avatar, himmel med sol, dag, butikk og sangbok
+// ---------------------------------------------------------------------------
+function oppdaterHud() {
+  const s = t.spill;
+  $('meny-knapp').textContent = s.avatar;
+  // Med natta skrudd av finnes det ingen dager eller solstråler å telle.
+  $('dag').textContent = liten() || s.evigDag ? '' : `Dag ${s.dag}`;
+  $('sol-tall').textContent = liten() || s.evigDag ? '' : `☀️ ${s.sol}`;
+  $('natt-knapp').textContent = s.evigDag ? '☀️' : '🌙';
+  $('natt-knapp').classList.toggle('av', !!s.evigDag);
+  $('natt-knapp').setAttribute('aria-label', s.evigDag ? 'Natta er av (alltid dag). Trykk for å skru den på.' : 'Natta er på. Trykk for å skru den av.');
+  $('seil-knapp').hidden = !R.kanSeileTilbake(s);
+}
+
+function blandRgb(a, b, u) {
+  const pa = a.match(/\w\w/g).map((h) => parseInt(h, 16)), pb = b.match(/\w\w/g).map((h) => parseInt(h, 16));
+  return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * u)).join(',')})`;
+}
+
+function tegnHimmel(tsek) {
+  const c = $('himmel');
+  const W = c.clientWidth, H = c.clientHeight;
+  if (!W) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Med natta av står sola stille midt på himmelen.
+  const maal = t.natt ? 1 : t.spill.evigDag ? 0.45 : 1 - t.spill.sol / SOL[t.spill.nivaa];
+  t.solVis += (maal - t.solVis) * 0.12;
+  const f = t.solVis;
+  if (neonPaa()) { tegnNeonHimmel(ctx, W, H, f, tsek); return; }
+  const Mo = ['#9fc7e8', '#f7c9a9'], D = ['#5fa2d8', '#bfe1f5'], K = ['#4f3f86', '#f08a4b'];
+  const [topp, bunn] = f < 0.25 ? [blandRgb(Mo[0], D[0], f / 0.25), blandRgb(Mo[1], D[1], f / 0.25)]
+    : f < 0.7 ? [D[0], D[1]] : [blandRgb(D[0], K[0], (f - 0.7) / 0.3), blandRgb(D[1], K[1], (f - 0.7) / 0.3)];
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, topp);
+  g.addColorStop(1, bunn);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // Sola går i en bue mellom dagtallet (venstre) og solstrålene (høyre).
+  const sx = W * (0.2 + 0.6 * f), sy = H * 0.88 - Math.sin(Math.PI * f) * H * 0.5;
+  const r = H * 0.19;
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(tsek * 0.25);
+  for (let i = 0; i < 12; i++) {
+    const v = (i / 12) * Math.PI * 2;
+    poly(ctx, [[Math.cos(v - 0.13) * r * 1.15, Math.sin(v - 0.13) * r * 1.15], [Math.cos(v) * r * 1.7, Math.sin(v) * r * 1.7],
+      [Math.cos(v + 0.13) * r * 1.15, Math.sin(v + 0.13) * r * 1.15]], i % 2 ? '#ffc93c' : '#ffe07a');
+  }
+  ctx.restore();
+  const skive = [];
+  for (let i = 0; i < 10; i++) { const v = (i / 10) * Math.PI * 2; skive.push([sx + Math.cos(v) * r, sy + Math.sin(v) * r]); }
+  fasett(ctx, skive, '#ffd23f', { styrke: 0.8 });
+  if (liten()) {
+    ctx.fillStyle = '#7a4a10';
+    for (const dx of [-0.32, 0.32]) { ctx.beginPath(); ctx.arc(sx + dx * r, sy - r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#7a4a10';
+    ctx.lineWidth = r * 0.09;
+    ctx.beginPath(); ctx.arc(sx, sy + r * 0.05, r * 0.4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  }
+  const kveld = klamp((f - 0.7) / 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 16) ctx.lineTo(x, H - 6 - Math.sin(x / 90 + 0.5) * 5 - Math.sin(x / 37) * 2);
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = blandRgb('#4e7d35', '#2d3b52', kveld);
+  ctx.fill();
+}
+
+/** Himmelen på neonøya: lilla himmel, en stripete «synthwave»-sol og et lysende rutenett i horisonten. */
+function tegnNeonHimmel(ctx, W, H, f, tsek) {
+  const kveld = klamp((f - 0.6) / 0.4);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, blandRgb('#2a0a5e', '#0c0224', kveld));
+  g.addColorStop(1, blandRgb('#c2189b', '#3d0b5c', kveld));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  const sx = W * (0.2 + 0.6 * f), sy = H * 0.86 - Math.sin(Math.PI * f) * H * 0.48;
+  const r = H * 0.26;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI * 2);
+  ctx.clip();
+  const sg = ctx.createLinearGradient(0, sy - r, 0, sy + r);
+  sg.addColorStop(0, '#fff36b');
+  sg.addColorStop(0.55, '#ff8a3d');
+  sg.addColorStop(1, '#ff2bd6');
+  ctx.fillStyle = sg;
+  ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+  // Striper som glir nedover sola
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let k = 0; k < 5; k++) {
+    const u = (k / 5 + tsek * 0.08) % 1;
+    const y = sy + r * (u * 1.1 - 0.1);
+    if (y > sy) ctx.fillRect(sx - r, y, r * 2, Math.max(1, r * 0.1 * u));
+  }
+  ctx.restore();
+  // Rutenett langs horisonten
+  ctx.save();
+  ctx.shadowColor = '#19e3ff';
+  ctx.shadowBlur = 6;
+  ctx.strokeStyle = '#19e3ff';
+  ctx.lineWidth = 1.5;
+  const hy = H - 8;
+  ctx.beginPath();
+  ctx.moveTo(0, hy); ctx.lineTo(W, hy);
+  for (let x = -((tsek * 12) % 24); x < W + 24; x += 24) { ctx.moveTo(x, hy); ctx.lineTo(W / 2 + (x - W / 2) * 1.6, H); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Natta: stjerneskudd man kan fange, så ny dag
+// ---------------------------------------------------------------------------
+/** Knappen øverst: skrur natta av (alltid dag, ingen solstråler å bruke opp) eller på igjen. */
+function byttNatt() {
+  L.vekk();
+  const paa = !t.spill.evigDag;
+  R.settEvigDag(t.spill, paa);
+  L.INSTRUMENT.xylofon(paa ? 783.99 : 523.25);
+  melding(liten() ? (paa ? '☀️♾️' : '🌙')
+    : paa ? 'Natta er skrudd av. Nå er det alltid dag, og du kan trykke så mye du vil.'
+    : 'Natta er skrudd på igjen. Sola går ned når solstrålene er brukt opp.', { ikon: liten() ? '' : paa ? '☀️' : '🌙' });
+  oppdaterHud();
+  lagreSnart();
+  t.skitten = true;
+}
+
+/**
+ * Med natta av går dagene videre i det stille: det har vokst fram nye ting, hjelperne går ut,
+ * og det kan ha kommet skattekryss og en ny idé – uten nattskjerm.
+ */
+function stilleNyDag(hendelser) {
+  const h = hendelser.find((e) => e.type === 'nyDag');
+  if (!h) return;
+  // Det hjelperne ikke rakk forrige dag, kommer rett i forrådet.
+  if (t.tur) t.tur = null;
+  const [dx, dy] = dor();
+  for (const gave of h.etterslep) flyTil(gave, paaSkjerm(dx, dy));
+  if (h.ide) setTimeout(() => L.fanfare(2), 600);
+  if (h.oppdrag.length) setTimeout(startTur, 900);
+  if (h.kryss.length) {
+    melding(liten() ? '✖️'.repeat(h.kryss.length) + ' 🎁'
+      : `Det har dukket opp ${h.kryss.length} skattekryss på øya. Trykk på dem for å grave fram kister!`, { ikon: liten() ? '' : '✖️🎁' });
+  }
+  oppdaterHud();
+  t.skitten = true;
+}
+
+function startNatt() {
+  if (t.natt || !t.spill || t.seiler) return;
+  if (t.naer) { t.naer.kveld = false; lukkNaer(); }
+  avbrytPlassering();
+  t.spill.sol = 0;
+  t.natt = { t0: naa() / 1000, skudd: [], gnister: [], neste: naa() / 1000 + 0.8, slutt: null,
+    stjerner: Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.85, r: 0.6 + Math.random() * 1.4, fase: Math.random() * 6 })) };
+  L.solnedgang();
+  t.natt.full = t.spill.nattFangst >= MAKS_STJERNER;
+  oppdaterNattTekst();
+  $('natt').hidden = false;
+  oppdaterHud();
+  lagreSnart();
+  clearTimeout(t.nattTid);
+  t.nattTid = setTimeout(godMorgen, 30000);
+}
+
+/** Teksten øverst om natta: hvor mange stjerneskudd man har fanget (høyst MAKS_STJERNER). */
+function oppdaterNattTekst() {
+  const n = t.spill.nattFangst, full = n >= MAKS_STJERNER;
+  $('natt').querySelector('.natt-tekst').innerHTML = liten()
+    ? `🌙 ${n ? '✨'.repeat(n) : '✨'}${full ? ' 😴' : ''}`
+    : full ? `✨ ${n} av ${MAKS_STJERNER}! Nå har du fanget alt stjernestøvet i natt. God natt!`
+      : `🌙 Fang stjerneskudd! ✨ ${n} av ${MAKS_STJERNER} <small>(${VARER.stov.pris} 🪙 hver)</small>`;
+}
+
+function godMorgen() {
+  if (!t.natt || t.natt.slutt) return;
+  clearTimeout(t.nattTid);
+  t.natt.slutt = naa() / 1000;
+  L.vekk();
+  L.morgen();
+  setTimeout(() => {
+    t.natt = null;
+    $('natt').hidden = true;
+    t.tur = null;
+    const [h] = R.nyDag(t.spill, t.verden);
+    // Det hjelperne ikke rakk i går, ble gjort ferdig i natt: forrådet vises som det er.
+    t.vist = { ...t.spill.forrad, mynter: t.spill.mynter };
+    tegnForrad();
+    // Det personene gjør, får man vite ved å trykke på dem. Her er det bare lyd og lyspære.
+    if (h.ide) setTimeout(() => L.fanfare(2), 2600);
+    if (h.oppdrag.length) setTimeout(startTur, 1300);
+    oppdaterHud();
+    lagreSnart();
+    t.skitten = true;
+    if (h.kryss.length) {
+      melding(liten() ? '✖️'.repeat(h.kryss.length) + ' 🎁'
+        : `Dag ${h.dag}! I natt har det dukket opp ${h.kryss.length} skattekryss på øya. Trykk på dem for å grave fram kister!`, { ikon: liten() ? '' : '✖️🎁' });
+    } else {
+      melding(h.vokst.length ? `Dag ${h.dag}! Det har vokst fram ${h.vokst.length} nye ting.` : `Dag ${h.dag}!`, { ikon: '☀️' });
+    }
+  }, 1100);
+}
+
+function tegnNatt(tsek) {
+  const n = t.natt;
+  const c = $('natt-lerret');
+  const W = c.clientWidth, H = c.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const inn = klamp((tsek - n.t0) / 1.2) * (n.slutt ? 1 - klamp((tsek - n.slutt) / 1.0) : 1);
+  $('natt').style.pointerEvents = n.slutt ? 'none' : 'auto';
+  $('natt').style.opacity = inn;
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(12, 16, 42, 0.94)');
+  g.addColorStop(1, 'rgba(28, 30, 70, 0.86)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#f4ecc8';
+  ctx.beginPath(); ctx.arc(W - 70, 70, 28, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgb(14, 18, 45)';
+  ctx.beginPath(); ctx.arc(W - 58, 63, 26, 0, Math.PI * 2); ctx.fill();
+  for (const s of n.stjerner) {
+    ctx.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(tsek * 1.3 + s.fase));
+    ctx.fillStyle = '#fff6d8';
+    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  if (!n.slutt && !n.full && tsek > n.neste) {
+    n.neste = tsek + 0.7 + Math.random() * 0.8;
+    const fraVenstre = Math.random() < 0.5;
+    n.skudd.push({ t0: tsek, x0: fraVenstre ? Math.random() * W * 0.4 : W * (0.6 + Math.random() * 0.4), y0: Math.random() * H * 0.4,
+      vx: (fraVenstre ? 1 : -1) * W * (0.18 + Math.random() * 0.1), vy: H * (0.16 + Math.random() * 0.1), liv: 2.6 });
+  }
+  n.skudd = n.skudd.filter((s) => tsek - s.t0 < s.liv && !s.tatt);
+  for (const s of n.skudd) {
+    const a = tsek - s.t0;
+    s.x = s.x0 + s.vx * a;
+    s.y = s.y0 + s.vy * a;
+    ctx.globalAlpha = 1 - klamp((a - s.liv + 0.4) / 0.4);
+    const hale = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 0.35, s.y - s.vy * 0.35);
+    hale.addColorStop(0, 'rgba(255, 236, 160, 0.9)');
+    hale.addColorStop(1, 'rgba(255, 236, 160, 0)');
+    ctx.strokeStyle = hale;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.35, s.y - s.vy * 0.35); ctx.stroke();
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const v = tsek * 3 + s.t0 + (i / 10) * Math.PI * 2;
+      const rr = i % 2 ? 6 : 14;
+      pts.push([s.x + Math.cos(v) * rr, s.y + Math.sin(v) * rr]);
+    }
+    poly(ctx, pts, '#ffd23f');
+  }
+  n.gnister = n.gnister.filter((q) => tsek - q.t0 < 0.9);
+  for (const q of n.gnister) {
+    const a = tsek - q.t0;
+    ctx.globalAlpha = 1 - a / 0.9;
+    ctx.fillStyle = '#ffe58a';
+    ctx.beginPath(); ctx.arc(q.x + q.vx * a, q.y + q.vy * a + 60 * a * a, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function fangStjerne(e) {
+  const n = t.natt;
+  if (!n || n.slutt) return;
+  L.vekk();
+  const r = $('natt-lerret').getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const s = n.skudd.find((q) => Math.hypot(q.x - x, q.y - y) < 55);
+  if (!s) return;
+  const h = R.fangStjerne(t.spill);
+  if (h[0].type !== 'stjerne') return;
+  s.tatt = true;
+  L.stjerne();
+  for (let i = 0; i < 14; i++) {
+    const v = Math.random() * Math.PI * 2;
+    n.gnister.push({ t0: naa() / 1000, x: s.x, y: s.y, vx: Math.cos(v) * 130, vy: Math.sin(v) * 130 });
+  }
+  flyTil({ stov: 1 }, { x: e.clientX, y: e.clientY });
+  oppdaterNattTekst();
+  if (h.some((q) => q.type === 'fullNatt')) {
+    // Natta er full: ingen flere stjerneskudd, og snart blir det morgen.
+    n.full = true;
+    n.skudd = [];
+    setTimeout(() => L.fanfare(2), 400);
+    clearTimeout(t.nattTid);
+    t.nattTid = setTimeout(godMorgen, 4000);
+  }
+  lagreSnart();
+}
+
+// ---------------------------------------------------------------------------
+// Meny, sangbok og meldinger
+// ---------------------------------------------------------------------------
+function aapneMeny() {
+  L.vekk();
+  const s = t.spill;
+  const annet = s.nivaa === 'liten' ? 'stor' : 'liten';
+  $('meny-nivaa').textContent = `Bytt til ${NIVAA[annet].ikon} ${NIVAA[annet].navn}`;
+  $('meny-lyd').textContent = L.lydPaa() ? '🔊 Lyd på' : '🔇 Lyd av';
+  $('meny-tittel').textContent = `${s.avatar} ${s.navn}`;
+  $('meny').showModal();
+}
+
+/** Sangboka (i stavkirka): alle melodiene. De man har funnet, kan spilles – hele raden er en knapp. */
+function aapneSangbok() {
+  L.vekk();
+  $('kirke').hidden = false;
+  tegnSangbok();
+}
+
+function tegnSangbok() {
+  const s = t.spill;
+  const har = (id) => s.sanger[id] ?? 0;
+  const funnet = L.SANGER.filter((id) => har(id) > 0).length, hele = L.SANGER.filter((id) => har(id) >= 3).length;
+  $('kirke-tall').textContent = `${funnet} av ${L.SANGER.length} melodier funnet · ${hele} kan du helt`;
+  $('kirke-hint').textContent = !L.lydPaa() ? '🔇 Lyden er skrudd av i menyen.'
+    : funnet ? 'Trykk på en melodi for å høre den. Trykk ferdig en stor ting på øya for å lære hele melodien (♪♪♪).'
+    : 'Trykk på trær, steiner og andre ting på øya for å finne melodier.';
+  const rad = (id) => {
+    const m = L.SANG[id], n = har(id);
+    const noter = `<span class="noter">${[1, 2, 3].map((k) => `<span class="note ${n >= k ? 'har' : ''}">${'♪'.repeat(k)}</span>`).join('')}</span>`;
+    return n
+      ? `<button class="sangrad${n >= 3 ? ' hel' : ''}" data-sang="${id}"><span class="spill">▶</span>
+          <span class="sn"><b>${esc(m.navn)}</b><small>${esc(m.av)}</small></span>${noter}<span class="framdrift"></span></button>`
+      : `<div class="sangrad ukjent"><span class="spill">?</span><span class="sn"><b>???</b><small>${esc(m.av)}</small></span>${noter}</div>`;
+  };
+  const gruppe = (navn, tittel) => `<h3>${tittel}</h3>${L.SANGER.filter((id) => L.SANG[id].gruppe === navn).map(rad).join('')}`;
+  $('kirke-liste').innerHTML = gruppe('klassisk', '🎻 Klassisk musikk') + gruppe('sang', '🎶 Sanger og viser');
+  $('kirke-liste').querySelectorAll('[data-sang]').forEach((b) => { b.onclick = () => spillSang(b.dataset.sang, b); });
+}
+
+let spilles = null;
+
+/** Spiller det man har lært av melodien (starten, litt mer, eller hele). Et nytt trykk stopper den. */
+function spillSang(id, knapp) {
+  L.vekk();
+  const var_ = spilles === id;
+  stoppSang();
+  const n = t.spill.sanger[id] ?? 0;
+  if (var_ || !n) return;
+  const antall = n >= 3 ? L.SANG[id].toner.length : L.SANG[id].deler[n - 1];
+  spilles = id;
+  knapp.classList.add('spiller');
+  knapp.querySelector('.spill').textContent = '⏹';
+  const strek = knapp.querySelector('.framdrift');
+  L.spillMelodi(id, antall, {
+    vedTone: (k) => { strek.style.width = `${((k + 1) / antall) * 100}%`; },
+    vedSlutt: () => { if (spilles === id) stoppSang(); },
+  });
+}
+
+function stoppSang() {
+  L.stoppMelodi();
+  spilles = null;
+  $('kirke-liste').querySelectorAll('.sangrad.spiller').forEach((b) => {
+    b.classList.remove('spiller');
+    b.querySelector('.spill').textContent = '▶';
+    b.querySelector('.framdrift').style.width = '0';
+  });
+}
+
+function lukkSangbok() {
+  stoppSang();
+  $('kirke').hidden = true;
+  t.skitten = true;
+}
+
+let meldingTid = 0;
+/** Melding nederst. fast = hvem som snakker; da blir den stående til man trykker på personen igjen. */
+function melding(tekst, { ikon: ik = '', fast = false } = {}) {
+  const el = $('melding');
+  t.snakker = fast || false;
+  if (liten()) {
+    if (!ik) return;
+    el.textContent = ik;
+  } else el.textContent = ik ? `${ik} ${tekst}` : tekst;
+  el.hidden = false;
+  el.classList.remove('vis');
+  void el.offsetWidth;
+  el.classList.add('vis');
+  clearTimeout(meldingTid);
+  if (!fast) meldingTid = setTimeout(() => { el.hidden = true; }, 3000);
+}
+
+/** Barnet på skolen heter det samme som spilleren. */
+const oppfinner = () => t.spill?.navn || 'Theo';
+const eierform = (navn) => (/[sxz]$/i.test(navn) ? `${navn}'` : `${navn}s`);
+
+// ---------------------------------------------------------------------------
+// Tegnesløyfe
+// ---------------------------------------------------------------------------
+function hintRuter() {
+  const s = t.spill, v = t.verden;
+  if (t.plasser) return [...s.avdekket.keys()].filter((i) => R.kanPlassere(s, v, i, t.plasser.id));
+  if (s.stat.avdekket === 0) return [...s.avdekket.keys()].filter((i) => R.kanBorstes(s, v, i));
+  if (s.stat.ting === 0) return [...s.avdekket.keys()].filter((i) => s.avdekket[i] && R.tingVed(s, v, i));
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Hjelperne: ut av leiren om morgenen, samle inn én ting hver, og hjem igjen
+// ---------------------------------------------------------------------------
+const HJELPER_H = RUTE * 0.4;
+const VELKOMST = 12000;   // så lenge en ny hjelper står ute og vinker (ms)
+
+/** Døra på leiren (der hjelperne kommer ut og går inn). */
+function dor() {
+  const [x, y] = midtAv(t.verden.startIndeks);
+  return [x - RUTE * 0.05, y + RUTE * 0.25];
+}
+
+/** Fra et punkt på brettet til skjermen (for ting som flyr ned i forrådet). */
+function paaSkjerm(kx, ky) {
+  const k = t.kamera, r = k.lerret.getBoundingClientRect();
+  return { x: r.left + ((kx - k.x) * k.skala) / k.dpr, y: r.top + ((ky - k.y) * k.skala) / k.dpr };
+}
+
+function startTur() {
+  clearTimeout(t.turPause);
+  const s = t.spill;
+  if (!s?.oppdrag.length) return;
+  const [lx, ly] = dor();
+  t.tur = {
+    t0: naa(),
+    ledd: s.oppdrag.map((o, k) => {
+      const [mx, my] = midtAv(o.i);
+      const til = [mx - RUTE * 0.3, my + RUTE * 0.24];
+      const ut = 1000 + (Math.hypot(til[0] - lx, til[1] - ly) / RUTE) * 480;
+      return { ...o, til, ut, arbeid: 3000, start: 300 + k * 900, ferdig: false, hugg: 0 };
+    }),
+  };
+  t.skitten = true;
+}
+
+function hjelperFerdig(l) {
+  const [h] = R.hjelperFerdig(t.spill, t.verden, l.h);
+  l.resultat = h?.type === 'hjelperHostet' ? h.gave : null;
+  const [kx, ky] = midtAv(l.i);
+  if (h?.type === 'hjelperHostet') {
+    const def = TING[l.type];
+    sprut(kx, ky, { farger: def.sprut, antall: 18, fart: 1.4 });
+    L.INSTRUMENT[def.instrument](523.25);
+    setTimeout(() => flyTil(h.gave, paaSkjerm(kx, ky)), 250);
+  } else {
+    flytendeTekst(kx, ky - 20, '🤷', { varighet: 1200 });
+  }
+  t.skitten = true;
+  lagreSnart();
+}
+
+const myk = (u) => u * u * (3 - 2 * u);
+
+function tegnHjelpere(ctx, ms) {
+  const tsek = ms / 1000, [lx, ly] = dor();
+  const tegn = [];   // samles og tegnes ovenfra og ned, så de som står foran, havner foran
+  const tur = t.tur;
+  if (tur) {
+    let igang = false;
+    for (const l of tur.ledd) {
+      const hj = t.spill.hjelpere[l.h];
+      const tau = ms - tur.t0 - l.start;
+      if (!hj || tau > l.ut * 2 + l.arbeid) continue;
+      igang = true;
+      if (tau < 0) continue;
+      let x, y, gaar = 1, arbeid = 0, mot;
+      if (tau < l.ut) {
+        const u = myk(tau / l.ut);
+        x = lx + (l.til[0] - lx) * u; y = ly + (l.til[1] - ly) * u;
+        mot = l.til[0] >= lx ? 1 : -1;
+      } else if (tau < l.ut + l.arbeid) {
+        [x, y] = l.til;
+        gaar = 0; arbeid = 1; mot = 1;
+        const hugg = Math.floor((tau - l.ut) / 520);
+        if (hugg > l.hugg) {
+          l.hugg = hugg;
+          const [kx, ky] = midtAv(l.i);
+          sprut(kx, ky, { farger: TING[l.type].sprut, antall: 5, fart: 0.8 });
+        }
+        if (!l.ferdig && tau > l.ut + l.arbeid * 0.85) { l.ferdig = true; hjelperFerdig(l); }
+      } else {
+        const u = myk((tau - l.ut - l.arbeid) / l.ut);
+        x = l.til[0] + (lx - l.til[0]) * u; y = l.til[1] + (ly - l.til[1]) * u;
+        mot = lx >= l.til[0] ? 1 : -1;
+      }
+      // Ute av døra og inn igjen: de blir synlige gradvis
+      const ved = Math.min(1, Math.hypot(x - lx, y - ly) / (RUTE * 0.15));
+      const fase = tau < l.ut ? 'ut' : tau < l.ut + l.arbeid ? 'arbeid' : 'hjem';
+      tegn.push({ x, y, alfa: ved, o: { farge: hj.farge, nr: l.h, t: tsek + l.h * 0.7, gaar, arbeid, type: l.type, mot }, hvem: { type: 'hjelper', l, fase } });
+    }
+    if (!igang) {
+      // Alle er hjemme. Er det flere turer igjen i dag, hviler de litt og går ut igjen.
+      t.tur = null;
+      lagreSnart();
+      if (R.nesteRunde(t.spill, t.verden).length) { t.turPause = setTimeout(startTur, 2500); lagreSnart(); }
+    }
+  }
+  const v = t.velkomst;
+  if (v) {
+    const tau = ms - v.t0;
+    if (tau > VELKOMST) t.velkomst = null;
+    else {
+      v.nye.forEach((n, k) => {
+        const hj = t.spill.hjelpere[n.nr];
+        const maal = [lx + RUTE * (0.3 + 0.18 * k), ly + RUTE * 0.12];
+        const ut = myk(Math.min(1, tau / 900)), inn = myk(Math.max(0, (tau - (VELKOMST - 900)) / 900));
+        const u = ut - inn;
+        const x = lx + (maal[0] - lx) * u, y = ly + (maal[1] - ly) * u;
+        const vinker = tau > 900 && tau < VELKOMST - 900;
+        tegn.push({ x, y, alfa: Math.min(1, u * 4), o: { farge: hj.farge, nr: n.nr, t: tsek + k, gaar: vinker ? 0 : 1, vink: vinker ? 1 : 0, mot: tau > VELKOMST - 900 ? -1 : 1 }, hvem: { type: 'ny', nr: n.nr } });
+      });
+    }
+  }
+  const g = oppdaterGutt(ms);
+  if (g) {
+    const ide = t.spill.ideDag === t.spill.dag;
+    const hopp = Math.max(0, 1 - (ms - g.hopp) / 600) * Math.abs(Math.sin((ms - g.hopp) / 90)) * RUTE * 0.06
+      + (ide && !g.gaar ? Math.abs(Math.sin(tsek * 4)) * RUTE * 0.025 : 0);
+    tegn.push({ x: g.x, y: g.y - hopp, alfa: Math.min(1, (ms - g.inn) / 500), ide, hvem: { type: 'gutt' },
+      o: { farge: OPPFINNER.farge, nr: 2, t: tsek, gaar: g.gaar, mot: g.mot, briller: true, vink: ide && !g.gaar ? 1 : 0 } });
+  }
+  const lr = oppdaterLaerer(ms);
+  if (lr) {
+    tegn.push({ x: lr.x, y: lr.y, alfa: Math.min(1, (ms - lr.inn) / 500), stor: true, hvem: { type: 'laerer' },
+      o: { farge: LAERER.farge, nr: 4, t: tsek * 0.8, gaar: lr.gaar, mot: lr.mot, type: 'bok' } });
+  }
+  tegn.sort((a, b) => a.y - b.y);
+  t.personer = tegn;
+  for (const d of tegn) {
+    ctx.globalAlpha = d.alfa;
+    tegnMenneske(ctx, d.x, d.y, HJELPER_H * (d.stor ? 1.2 : 1), d.o);
+    if (d.ide) tegnLyspaere(ctx, d.x, d.y - HJELPER_H * 1.3, tsek);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Barnet på skolen går rundt i nærheten, stopper og tenker, og går videre. */
+function oppdaterGutt(ms) {
+  return vandre('gutt', ms, { radius: 2, fart: 1600, pause: [1500, 5000], dor: [-0.14, 0.3] });
+}
+
+/** Læreren går rolig rundt rett ved skolen. */
+function oppdaterLaerer(ms) {
+  return vandre('laerer', ms, { radius: 1, fart: 2300, pause: [3000, 8000], dor: [0.12, 0.32] });
+}
+
+/** En som går rundt i nærheten av skolen: velger et sted, går dit, står en stund, og går videre. */
+function vandre(navn, ms, { radius, fart, pause, dor: [ox, oy] }) {
+  const s = t.spill, v = t.verden, skole = R.skoleVed(s);
+  if (skole < 0) { t[navn] = null; return null; }
+  const [sx, sy] = midtAv(skole);
+  let g = t[navn];
+  if (!g || g.skole !== skole) {
+    const dorPos = [sx + RUTE * ox, sy + RUTE * oy];
+    g = t[navn] = { skole, x: dorPos[0], y: dorPos[1], fra: dorPos, til: dorPos, t0: ms, varighet: 0, pause: 900, mot: 1, gaar: 0, inn: ms, hopp: -9999 };
+  }
+  if (ms - g.t0 >= g.varighet + g.pause) {
+    const B = v.bredde, kx = skole % B, ky = Math.floor(skole / B);
+    const mulige = [];
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = kx + dx, y = ky + dy;
+        if (x < 0 || y < 0 || x >= B || y >= v.hoyde) continue;
+        const i = y * B + x;
+        if (s.avdekket[i] && R.TERRENGNAVN[v.terreng[i]] !== 'vann') mulige.push(i);
+      }
+    }
+    const i = mulige[Math.floor(Math.random() * mulige.length)] ?? skole;
+    const [mx, my] = midtAv(i);
+    const til = [mx + (Math.random() - 0.5) * RUTE * 0.5, my + RUTE * (0.1 + Math.random() * 0.25)];
+    g.fra = [g.x, g.y];
+    g.til = til;
+    g.t0 = ms;
+    g.varighet = 500 + (Math.hypot(til[0] - g.x, til[1] - g.y) / RUTE) * fart;
+    g.pause = pause[0] + Math.random() * (pause[1] - pause[0]);
+    g.mot = til[0] >= g.x ? 1 : -1;
+  }
+  const u = Math.min(1, (ms - g.t0) / (g.varighet || 1));
+  const e = myk(u);
+  g.x = g.fra[0] + (g.til[0] - g.fra[0]) * e;
+  g.y = g.fra[1] + (g.til[1] - g.fra[1]) * e;
+  g.gaar = u < 1 ? 1 : 0;
+  return g;
+}
+
+/** Lyspæra over hodet: barnet har fått en idé. */
+function tegnLyspaere(ctx, x, y, tsek) {
+  const r = RUTE * 0.075 * (1 + Math.sin(tsek * 5) * 0.08);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+  g.addColorStop(0, 'rgba(255, 240, 140, 0.75)');
+  g.addColorStop(1, 'rgba(255, 240, 140, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#ffd23f';
+  ctx.lineWidth = RUTE * 0.012;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2 + tsek * 0.8;
+    ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r * 1.5, y + Math.sin(a) * r * 1.5); ctx.lineTo(x + Math.cos(a) * r * 2.2, y + Math.sin(a) * r * 2.2); ctx.stroke();
+  }
+  ctx.fillStyle = '#fff3a0';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#9aa1ae';
+  ctx.fillRect(x - r * 0.45, y + r * 0.8, r * 0.9, r * 0.55);
+  ctx.strokeStyle = '#e0a020';
+  ctx.lineWidth = RUTE * 0.008;
+  ctx.beginPath(); ctx.moveTo(x - r * 0.35, y + r * 0.2); ctx.lineTo(x - r * 0.15, y - r * 0.2); ctx.lineTo(x, y + r * 0.1); ctx.lineTo(x + r * 0.15, y - r * 0.2); ctx.lineTo(x + r * 0.35, y + r * 0.2); ctx.stroke();
+}
+
+/** Personen nærmest et trykk på brettet (hjelpere, nye hjelpere og barnet på skolen), eller null. */
+function finnPerson(kx, ky) {
+  let best = null, bestAvst = RUTE * 0.32;
+  for (const p of t.personer ?? []) {
+    if (p.alfa < 0.5) continue;
+    const avst = Math.hypot(kx - p.x, ky - (p.y - HJELPER_H * 0.5));
+    if (avst < bestAvst) { best = p; bestAvst = avst; }
+  }
+  return best;
+}
+
+const personNokkel = (hvem) => (hvem.type === 'gutt' || hvem.type === 'laerer' ? hvem.type : hvem.type === 'ny' ? `ny${hvem.nr}` : `h${hvem.l.h}`);
+
+/** Et trykk hvor som helst lukker snakkeboblen (det trykket gjør ikke noe annet på brettet). */
+function lukkSnakk() {
+  if (!t.snakker || $('melding').hidden) return;
+  $('melding').hidden = true;
+  t.lukketNokkel = t.snakker;
+  t.lukketVed = naa();
+  t.snakker = false;
+}
+
+/** Snakkeboblen står til man trykker et sted. */
+function snakk(nokkel, tekst, ikon, ikonLiten) {
+  if (t.snakker === nokkel && !$('melding').hidden) { $('melding').hidden = true; t.snakker = false; return; }
+  L.INSTRUMENT.xylofon(783.99);
+  if (liten()) melding('', { ikon: ikonLiten, fast: nokkel });
+  else melding(tekst, { ikon, fast: nokkel });
+}
+
+function snakkMed(hvem) {
+  if (hvem.type === 'gutt') { snakkMedGutt(); return; }
+  if (hvem.type === 'laerer') { aapneLaerer(); return; }
+  if (hvem.type === 'ny') {
+    const hj = t.spill.hjelpere[hvem.nr];
+    snakk(`ny${hvem.nr}`, `${hj.navn}: «Hei! Jeg heter ${hj.navn}. Hver morgen går jeg ut og samler inn noe for deg.»`, '👋', '🧑‍🌾👋');
+    return;
+  }
+  const { l, fase } = hvem, hj = t.spill.hjelpere[l.h];
+  const ikonTing = TING[l.type].ikon;
+  const SKAL = { tre: 'hogge et tre', stein: 'hakke stein', jern: 'hente jern', korn: 'slå korn', ull: 'klippe ulla på en sau', fisk: 'fiske' };
+  const GJOR = { tre: 'hogger jeg et tre', stein: 'hakker jeg stein', jern: 'henter jeg jern', korn: 'slår jeg korn', ull: 'klipper jeg ulla på sauen', fisk: 'fisker jeg' };
+  let tekst;
+  if (fase === 'ut') tekst = `«Jeg skal ${SKAL[l.type]}!»`;
+  else if (fase === 'arbeid') tekst = `«Nå ${GJOR[l.type]} …»`;
+  else if (l.resultat) {
+    const [vare, n] = Object.entries(l.resultat)[0];
+    tekst = `«Jeg fikk ${n} ${VARER[vare].navn}! Nå går jeg hjem.»`;
+  } else tekst = '«Noen kom før meg, så jeg går hjem igjen.»';
+  snakk(`h${l.h}`, `${hj.navn}: ${tekst}`, '🧑‍🌾', `🧑‍🌾${fase === 'hjem' ? '🏠' : ikonTing}`);
+}
+
+/** Trykk på barnet: det forteller hva det tenker på (står til man trykker igjen). */
+function snakkMedGutt() {
+  const s = t.spill, g = t.gutt;
+  if (t.snakker === 'gutt' && !$('melding').hidden) { $('melding').hidden = true; t.snakker = false; return; }
+  g.hopp = naa();
+  L.INSTRUMENT.xylofon(783.99);
+  const tenker = R.tenkerPaaIde(s);
+  const siste = OPPFINNELSER.find((o) => o.id === s.oppfinnelser.at(-1));
+  if (liten()) { melding('', { ikon: s.ideDag === s.dag ? '🤓💡🎉' : '🤓🤔💡', fast: 'gutt' }); return; }
+  const tekst = s.ideDag === s.dag && siste ? `«Jeg har funnet på ${siste.tekst}! Se i butikken.»`
+    : !tenker ? '«Nå har jeg ikke flere ting å finne opp.»'
+    : '«Hmm … jeg tenker på noe nytt!»';
+  melding(`${oppfinner()}: ${tekst}`, { ikon: '🤓', fast: 'gutt' });
+}
+
+// ---------------------------------------------------------------------------
+// Læreren leser opp kunnskapstekster (fra Lesestjerna)
+// ---------------------------------------------------------------------------
+const EMNE_IKON = { krefter: '🚀', liv: '🦔', folk: '🧠', oppfinnelser: '💡', rekorder: '🏆' };
+let laererEmne = null, laererTekst = null;
+
+function aapneLaerer() {
+  L.vekk();
+  $('laerer-tittel').textContent = liten() ? '📚' : `📚 Lærer ${LAERER.navn} forteller`;
+  tegnEmner();
+  $('laerer-merk').hidden = !!window.speechSynthesis;
+  $('laerer-merk').textContent = 'Denne nettleseren kan ikke lese opp, men teksten står her.';
+  if (!$('laerer').open) $('laerer').showModal();
+  nyFortelling();
+}
+
+function tegnEmner() {
+  $('laerer-emner').innerHTML = [{ id: '', navn: 'Litt av alt' }, ...EMNER].map((e) =>
+    `<button class="${(laererEmne ?? '') === e.id ? 'valgt' : ''}" data-emne="${e.id}">${EMNE_IKON[e.id] ?? '🎲'}${liten() ? '' : ` ${esc(e.navn)}`}</button>`).join('');
+  $('laerer-emner').querySelectorAll('[data-emne]').forEach((b) => {
+    b.onclick = () => { laererEmne = b.dataset.emne || null; tegnEmner(); nyFortelling(); };
+  });
+}
+
+function nyFortelling() {
+  laererTekst = R.velgTekst(t.spill, laererEmne);
+  lagreSnart();
+  const setninger = Stemme.delISetninger(laererTekst.tekst);
+  $('laerer-tekst').innerHTML = `<div class="lt-tittel"><span class="emoji">${laererTekst.emoji}</span>${esc(laererTekst.tittel)}</div>
+    <p>${setninger.map((x, k) => `<span data-k="${k}">${esc(x)}</span>`).join(' ')}</p>`;
+  lesFortelling();
+}
+
+/** Leser teksten høyt; setningen som leses, lyser opp. */
+function lesFortelling() {
+  if (!laererTekst) return;
+  const merk = (k) => $('laerer-tekst').querySelectorAll('span[data-k]').forEach((el) => el.classList.toggle('les', Number(el.dataset.k) === k));
+  Stemme.lesOpp(laererTekst.tekst, { vedSetning: merk }).then((helt) => { if (helt) merk(-1); });
+}
+
+function lukkLaerer() {
+  Stemme.stille();
+  if ($('laerer').open) $('laerer').close();
+}
+
+// ---------------------------------------------------------------------------
+// Museet: skattene man har solgt, står utstilt i glassmontre (tegnes i museum.js)
+// ---------------------------------------------------------------------------
+const MUSEUMSTONER = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99];
+const museumstone = (vare) => MUSEUMSTONER[SKATTER.indexOf(vare) % MUSEUMSTONER.length];
+let sisteSal = 0;   // salen man sist var i (huskes til man bytter spiller)
+
+function aapneMuseum() {
+  L.vekk();
+  t.museum = { modus: 'rom', fra: 'rom', vare: null, sal: sisteSal, tilstand: Museum.nyTilstand(), treff: [], W: 0, H: 0, dpr: 1 };
+  $('museum').hidden = false;
+  tilpassMuseum();
+  oppdaterMuseumKnapper();
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, k) => setTimeout(() => L.INSTRUMENT.spilledaase(f), k * 130));
+}
+
+function tilpassMuseum() {
+  const m = t.museum, c = $('museum-lerret');
+  if (!m) return;
+  const r = $('museum').getBoundingClientRect();
+  m.W = Math.max(1, Math.round(r.width));
+  m.H = Math.max(1, Math.round(r.height));
+  m.dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(m.W * m.dpr);
+  c.height = Math.round(m.H * m.dpr);
+}
+
+function oppdaterMuseumKnapper() {
+  const m = t.museum;
+  // Museet har tekst også for 🐣 Liten (som øver seg på å lese).
+  $('museum-tilbake').textContent = m.modus === 'rom' ? '← Tilbake til øya' : '← Tilbake';
+  $('museum-samling').textContent = '📖 Samlingen';
+  $('museum-samling').hidden = m.modus !== 'rom';
+  $('museum-nav').hidden = m.modus !== 'rom';
+  $('museum-sal').textContent = Museum.SALER[m.sal].navn;
+}
+
+function tegnMuseet(tsek) {
+  const m = t.museum, ctx = $('museum-lerret').getContext('2d');
+  ctx.setTransform(m.dpr, 0, 0, m.dpr, 0, 0);
+  m.treff = Museum.tegn(ctx, m.W, m.H, tsek, m.tilstand, {
+    modus: m.modus, sal: m.sal, vare: m.vare, samling: t.spill.museum, dpr: m.dpr,
+    versaler: liten(),      // 🐣 Liten: navnene på steinene og metallene med store bokstaver
+    alt: t.spill.kreativ,   // i kreativmodus vises alle tingene, også dem man ikke har solgt
+    tittel: t.spill.navn ? `${eierform(t.spill.navn)} museum` : 'Museum',
+  });
+}
+
+/** Trykk i museet: på en monter (eller en rute i samlingen) for å se tingen stort, og på tingen for å snurre den. */
+function trykkMuseum(e) {
+  const m = t.museum;
+  if (!m) return;
+  L.vekk();
+  const r = $('museum-lerret').getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const hit = m.treff.find((o) => x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h);
+  if (m.modus === 'naer') {
+    if (!hit) { museumTilbake(); return; }
+    Museum.dytt(m.tilstand, hit.vare, x, y);
+    L.INSTRUMENT.spilledaase(museumstone(hit.vare) * 2);
+    setTimeout(() => L.INSTRUMENT.spilledaase(museumstone(hit.vare) * 3), 110);
+    return;
+  }
+  if (!hit) { if (m.modus === 'samling') museumTilbake(); return; }
+  m.fra = m.modus;
+  m.modus = 'naer';
+  m.vare = hit.vare;
+  // Fra samlingen: gå til salen der tingen står, så man kommer dit når man går tilbake til rommet.
+  if (m.fra === 'samling') m.sal = sisteSal = Museum.salFor(hit.vare);
+  L.INSTRUMENT.spilledaase(museumstone(hit.vare) * 2);
+  lesNavn(hit.vare);
+  oppdaterMuseumKnapper();
+}
+
+/** Navnet på metallet eller edelsteinen leses høyt (for både 🐣 Liten og 🧒 Stor), hvis lyden er på. */
+function lesNavn(vare) {
+  if (!L.lydPaa() || !window.speechSynthesis) return;
+  try { Stemme.si(VARER[vare].navn, 0.85); } catch { /* opplesing er pynt */ }
+}
+
+/** Neste eller forrige sal (rundt og rundt). */
+function byttSal(steg) {
+  const m = t.museum;
+  if (!m || m.modus !== 'rom') return;
+  L.vekk();
+  m.sal = sisteSal = (m.sal + steg + Museum.SALER.length) % Museum.SALER.length;
+  L.INSTRUMENT.xylofon(steg > 0 ? 587.33 : 523.25);
+  oppdaterMuseumKnapper();
+}
+
+function visSamling() {
+  if (!t.museum) return;
+  L.vekk();
+  t.museum.modus = 'samling';
+  L.INSTRUMENT.xylofon(659.25);
+  oppdaterMuseumKnapper();
+}
+
+/** Tilbake-knappen: fra nærbildet til der man kom fra, fra samlingen til rommet, og fra rommet ut på øya. */
+function museumTilbake() {
+  const m = t.museum;
+  if (!m) return;
+  L.vekk();
+  if (m.modus === 'rom') { lukkMuseum(); return; }
+  Stemme.stille();
+  m.modus = m.modus === 'naer' ? m.fra : 'rom';
+  m.fra = 'rom';
+  oppdaterMuseumKnapper();
+}
+
+function lukkMuseum() {
+  t.museum = null;
+  $('museum').hidden = true;
+  t.skitten = true;
+}
+
+/** En eller flere nye hjelpere har kommet: de kommer ut av leiren og vinker. */
+function velkommenHjelper(nye) {
+  if (!t.spill) return;
+  t.velkomst = { t0: naa(), nye };
+  L.fanfare(2);
+  t.skitten = true;
+}
+
+function tegnBrett(ms) {
+  const k = t.kamera, l = k.lerret;
+  const ctx = l.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = BAKGRUNN;
+  ctx.fillRect(0, 0, l.width, l.height);
+  k.anvend(ctx);
+  const utsnitt = {
+    x0: Math.floor(k.x / RUTE) - 1, y0: Math.floor(k.y / RUTE) - 1,
+    x1: Math.ceil((k.x + l.width / k.skala) / RUTE), y1: Math.ceil((k.y + l.height / k.skala) / RUTE),
+  };
+  const hint = hintRuter();
+  t.brett.tegn(ctx, t.spill, { utsnitt, skala: k.skala, avdekkAnim: t.avdekkAnim, borstAnim: t.borstAnim, byggAnim: t.byggAnim, naa: ms, hint });
+  tegnHjelpere(ctx, ms);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  tegnEffekter(ctx, (kx, ky) => ({ x: (kx - k.x) * k.skala, y: (ky - k.y) * k.skala }), k.skala, k.dpr);
+  t.brett.jobb(6);
+  for (const [i, tid] of t.borstAnim) if (ms - tid > 300) t.borstAnim.delete(i);
+  t.skitten = !!hint || t.brett.ko.size > 0;
+}
+
+function sloyfe() {
+  const ms = naa();
+  if (t.museum) tegnMuseet(ms / 1000);
+  else if (t.spill && !$('spill').hidden) {
+    tegnHimmel(ms / 1000);
+    if (t.skitten || t.tur || t.velkomst || t.brett.harLiv || t.avdekkAnim.size || t.borstAnim.size || t.byggAnim.size || harEffekter()) tegnBrett(ms);
+  }
+  if (t.naer) { tegnNaer(ms / 1000); glod($('naer-lerret'), 0.5); }
+  if (t.natt) tegnNatt(ms / 1000);
+  requestAnimationFrame(sloyfe);
+}
+
+// ---------------------------------------------------------------------------
+// Oppstart
+// ---------------------------------------------------------------------------
+function start() {
+  visVersjon();
+  // Statistikk: alle trykk mens spillet er åpent, og tiden man har hatt spillet framme.
+  document.addEventListener('pointerdown', () => { if (t.spill && !$('spill').hidden) t.spill.stat.klikk++; }, true);
+  setInterval(() => {
+    if (t.spill && !$('spill').hidden && !document.hidden) t.spill.stat.sekunder += 10;
+  }, 10000);
+  Stemme.forbered();
+  document.addEventListener('pointerdown', lukkSnakk, true);
+  neonKontekst($('lerret').getContext('2d'));
+  neonKontekst($('naer-lerret').getContext('2d'));
+  t.kamera = new Kamera($('lerret'), { vedTrykk: trykkPaa, vedEndring: () => { t.skitten = true; } });
+  addEventListener('resize', () => { if (t.spill) { t.kamera.tilpassLerret(); t.skitten = true; } tilpassMuseum(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && t.id && t.spill) Lagring.lagre(t.id, t.spill); });
+
+  $('ny-spiller').onclick = aapneNySpiller;
+  $('ny-avbryt').onclick = () => $('ny').close();
+  $('ny-start').onclick = lagNySpiller;
+
+  $('naer-lerret').addEventListener('pointerdown', (e) => { e.preventDefault(); trykkNaer(e); });
+  $('naer-lukk').onclick = lukkNaer;
+  $('naer').addEventListener('pointerdown', (e) => { if (e.target === $('naer')) lukkNaer(); });
+  lagTastatur($('matte-tast'), tastKiste);
+
+  $('natt-lerret').addEventListener('pointerdown', (e) => { e.preventDefault(); fangStjerne(e); });
+  $('morgen').onclick = godMorgen;
+  $('museum-lerret').addEventListener('pointerdown', (e) => { e.preventDefault(); trykkMuseum(e); });
+  $('museum-tilbake').onclick = museumTilbake;
+  $('museum-samling').onclick = visSamling;
+  $('museum-forrige').onclick = () => byttSal(-1);
+  $('museum-neste').onclick = () => byttSal(1);
+
+  $('meny-knapp').onclick = aapneMeny;
+  $('natt-knapp').onclick = byttNatt;
+  $('meny-sangbok').onclick = () => { $('meny').close(); aapneSangbok(); };
+  $('butikk-knapp').onclick = () => aapneButikk();
+  $('seil-knapp').onclick = aapneSjokart;
+  $('laerer-igjen').onclick = () => { L.vekk(); lesFortelling(); };
+  $('laerer-ny').onclick = () => { L.vekk(); nyFortelling(); };
+  $('laerer-lukk').onclick = lukkLaerer;
+  $('laerer').addEventListener('close', () => Stemme.stille());
+  $('sjokart-lukk').onclick = () => $('sjokart').close();
+  $('fane-selg').onclick = () => { fane = 'selg'; tegnButikk(); };
+  $('fane-kjop').onclick = () => { fane = 'kjop'; tegnButikk(); };
+  $('butikk-lukk').onclick = () => $('butikk').close();
+  $('plasser-avbryt').onclick = avbrytPlassering;
+  $('kirke-tilbake').onclick = lukkSangbok;
+  $('meny-lukk').onclick = () => $('meny').close();
+  $('meny-sov').onclick = () => { $('meny').close(); startNatt(); };
+  $('meny-lyd').onclick = () => {
+    L.settLyd(!L.lydPaa());
+    try { localStorage.setItem('oya2-lyd', L.lydPaa() ? 'paa' : 'av'); } catch { /* ignorer */ }
+    $('meny-lyd').textContent = L.lydPaa() ? '🔊 Lyd på' : '🔇 Lyd av';
+  };
+  $('meny-nivaa').onclick = () => {
+    R.byttNivaa(t.spill, t.spill.nivaa === 'liten' ? 'stor' : 'liten');
+    document.body.classList.toggle('liten', liten());
+    tegnForrad();
+    oppdaterHud();
+    lagreSnart();
+    $('meny').close();
+  };
+  $('meny-foreldre').onclick = () => aapnePort(aapneForeldre);
+  $('foreldre-start').onclick = () => { L.vekk(); aapnePort(aapneSpillere); };
+  $('port-glemt').onclick = () => settPort('glemt');
+  $('f-spillere').onclick = () => { lagreSnart(); $('foreldre').close(); aapneSpillere(); };
+  $('spillere-lukk').onclick = () => $('spillere').close();
+  $('endre-kode').onclick = () => { $('spillere').close(); aapnePort(aapneSpillere, 'ny1'); };
+  lagTastatur($('port-tast'), tastPort);
+  $('port-avbryt').onclick = () => { port = null; $('port').close(); };
+  $('foreldre-lukk').onclick = () => { lagreSnart(); $('foreldre').close(); };
+  $('meny-bytt').onclick = () => { $('meny').close(); visVelg(); };
+  $('meny-ny-oy').onclick = () => {
+    if (!confirm('Lage en helt ny øy? Den du har nå, forsvinner (foreldreinnstillingene beholdes).')) return;
+    const s = t.spill;
+    Lagring.lagre(t.id, R.nyttSpill({ navn: s.navn, nivaa: s.nivaa, avatar: s.avatar, foreldre: s.foreldre }));
+    $('meny').close();
+    startSpill(t.id);
+  };
+
+  visVelg();
+  requestAnimationFrame(sloyfe);
+}
+
+start();
+window.__oya = t; // for testing i nettleseren

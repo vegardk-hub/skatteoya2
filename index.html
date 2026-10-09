@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Skatteøya II">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Skatteøya II</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="ikon/favicon-64.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="ikon/favicon-32.png">
+  <link rel="apple-touch-icon" href="ikon/ikon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="spill.css">
+</head>
+<body>
+  <!-- Velg spiller -->
+  <section id="velg" class="velg">
+    <img class="logo" src="ikon/ikon-192.png" alt="">
+    <h1>Skatteøya II</h1>
+    <p class="under">Hvem skal spille?</p>
+    <div id="profilliste" class="profilliste"></div>
+    <button id="ny-spiller" class="stor-knapp">➕ Ny spiller</button>
+    <p class="smaa"><a href="katalog.html">🏰 Byggekatalogen</a></p>
+    <button id="foreldre-start" class="foreldre-knapp">🔒 Foreldrekontroll</button>
+  </section>
+
+  <dialog id="ny" class="kort">
+    <h2>Ny spiller</h2>
+    <label class="navnefelt">Navn <input id="ny-navn" maxlength="16" autocomplete="off" placeholder="Hva heter du?"></label>
+    <p class="etikett">Velg et dyr</p>
+    <div id="ny-avatar" class="valgrad avatarer"></div>
+    <p class="etikett">Hvem spiller?</p>
+    <div id="ny-nivaa" class="valgrad"></div>
+    <div class="knapper">
+      <button id="ny-avbryt">Avbryt</button>
+      <button id="ny-start" class="hoved">Seil til øya ⛵</button>
+    </div>
+  </dialog>
+
+  <!-- Spillet -->
+  <main id="spill" class="spill" hidden>
+    <header class="topp">
+      <button id="meny-knapp" class="rund" aria-label="Meny"></button>
+      <div class="himmel">
+        <canvas id="himmel"></canvas>
+        <span id="dag"></span>
+        <span id="sol-tall"></span>
+      </div>
+      <button id="seil-knapp" class="rund" aria-label="Sjøkartet" hidden>⛵</button>
+      <button id="butikk-knapp" class="rund" aria-label="Butikken">🏪</button>
+      <button id="natt-knapp" class="rund" aria-label="Natt av eller på">🌙</button>
+    </header>
+    <canvas id="lerret"></canvas>
+    <footer id="forrad" class="forrad"></footer>
+  </main>
+
+  <!-- Nærbilde av en ting -->
+  <div id="naer" class="naer" hidden>
+    <div class="naer-boks">
+      <div id="naer-tittel" class="naer-tittel"></div>
+      <div class="naer-innhold">
+        <canvas id="naer-lerret"></canvas>
+        <div id="matte" class="matte" hidden>
+          <div class="matte-stykke"><span id="matte-stykke"></span> <span id="matte-svar" class="matte-svar">?</span></div>
+          <div id="matte-melding" class="matte-melding"></div>
+          <div id="matte-valg" class="matte-valg"></div>
+          <div id="matte-tast" class="tastatur"></div>
+        </div>
+      </div>
+      <div id="havn-valg" class="havn-valg" hidden></div>
+      <button id="naer-lukk" class="rund lukk" aria-label="Lukk">✕</button>
+    </div>
+  </div>
+
+  <!-- Museet: skattene man har solgt, i glassmontre -->
+  <div id="museum" class="museum" hidden>
+    <canvas id="museum-lerret"></canvas>
+    <button id="museum-tilbake" class="museum-knapp venstre"></button>
+    <button id="museum-samling" class="museum-knapp hoyre"></button>
+    <div id="museum-nav" class="museum-nav">
+      <button id="museum-forrige" class="museum-knapp" aria-label="Forrige sal">◀</button>
+      <span id="museum-sal"></span>
+      <button id="museum-neste" class="museum-knapp" aria-label="Neste sal">▶</button>
+    </div>
+  </div>
+
+  <!-- Stavkirka: sangboka med alle melodiene man har funnet -->
+  <div id="kirke" hidden>
+    <button id="kirke-tilbake" class="museum-knapp venstre">← Tilbake til øya</button>
+    <h2>🎵 Sangboka</h2>
+    <div class="kirke-bok">
+      <p id="kirke-tall"></p>
+      <p id="kirke-hint"></p>
+      <div id="kirke-liste"></div>
+    </div>
+  </div>
+
+  <!-- Natta -->
+  <div id="natt" class="natt" hidden>
+    <canvas id="natt-lerret"></canvas>
+    <div class="natt-tekst">🌙 ✨</div>
+    <button id="morgen" class="stor-knapp">☀️ God morgen</button>
+  </div>
+
+  <dialog id="meny" class="kort">
+    <h2 id="meny-tittel"></h2>
+    <div class="menyknapper">
+      <button id="meny-sov">🌙 Legg deg nå</button>
+      <button id="meny-sangbok">🎵 Sangboka</button>
+      <button id="meny-nivaa"></button>
+      <button id="meny-lyd"></button>
+      <button id="meny-foreldre">🔒 For foreldre</button>
+      <button id="meny-bytt">👥 Bytt spiller</button>
+      <button id="meny-ny-oy">🏝️ Ny øy</button>
+      <button id="meny-lukk" class="hoved">Tilbake til øya</button>
+    </div>
+  </dialog>
+
+  <dialog id="laerer" class="kort bred">
+    <h2 id="laerer-tittel"></h2>
+    <div id="laerer-emner" class="emner"></div>
+    <div id="laerer-tekst" class="laerer-tekst"></div>
+    <p id="laerer-merk" class="midt forklaring" hidden></p>
+    <div class="knapper laerer-knapper">
+      <button id="laerer-igjen">🔊 Les igjen</button>
+      <button id="laerer-ny" class="hoved">➡️ Ny tekst</button>
+    </div>
+    <button id="laerer-lukk" class="full">Lukk</button>
+  </dialog>
+
+  <dialog id="sjokart" class="kort">
+    <h2>🗺️ Sjøkartet</h2>
+    <p id="sjokart-tekst" class="midt"></p>
+    <div id="oyliste" class="oyliste"></div>
+    <button id="sjokart-lukk" class="full">Bli her</button>
+  </dialog>
+
+  <dialog id="butikk" class="kort bred">
+    <h2>🏪 Butikken</h2>
+    <div class="faner"><button id="fane-selg">💰 Selg</button><button id="fane-kjop">🏰 Kjøp bygg</button></div>
+    <div id="butikk-mynter" class="mynter-linje"></div>
+    <div id="butikk-selg" class="butikk-innhold"></div>
+    <div id="butikk-kjop" class="butikk-innhold byggliste" hidden></div>
+    <div class="takfarge"><span id="takfarge-tekst">🎨 Farge på taket og flaggene</span><div id="takfarger" class="takfarger"></div></div>
+    <button id="butikk-lukk" class="hoved full">Tilbake til øya</button>
+  </dialog>
+
+  <dialog id="port" class="kort">
+    <h2>🔒 For voksne</h2>
+    <p id="port-tekst" class="midt"></p>
+    <div class="matte-stykke"><span id="port-stykke"></span> <span id="port-svar" class="matte-svar">?</span></div>
+    <p id="port-melding" class="matte-melding feil midt"></p>
+    <div id="port-tast" class="tastatur"></div>
+    <button id="port-glemt" class="full" hidden>Glemt koden?</button>
+    <button id="port-avbryt" class="full">Avbryt</button>
+  </dialog>
+
+  <dialog id="foreldre" class="kort bred">
+    <h2>🔒 Foreldrekontroll – <span id="foreldre-navn"></span></h2>
+    <p class="etikett">Hurtigvalg</p>
+    <div id="f-hurtig" class="valgrad"></div>
+    <p class="etikett">Mattestykker i kistene</p>
+    <div id="f-arter" class="arter"></div>
+    <p id="f-eksempel" class="eksempel"></p>
+    <p class="etikett">Svarmåte</p>
+    <div id="f-svar" class="valgrad"></div>
+    <p class="etikett">Telling</p>
+    <div id="f-telling" class="valgrad"></div>
+    <p class="etikett">Kreativmodus</p>
+    <div id="f-kreativ" class="kreativ"></div>
+    <p class="etikett">Statistikk</p>
+    <div id="f-stat" class="statistikk"></div>
+    <button id="f-spillere" class="full">👥 Spillere og foreldrekode</button>
+    <button id="foreldre-lukk" class="hoved full">Lagre og lukk</button>
+  </dialog>
+
+  <dialog id="spillere" class="kort">
+    <h2>🔒 Spillere</h2>
+    <p class="midt forklaring">Her kan du fjerne spillere. Øya og alt spilleren har samlet, blir slettet.</p>
+    <div id="spillerliste" class="spillerliste"></div>
+    <button id="endre-kode" class="full">🔑 Endre foreldrekoden</button>
+    <button id="spillere-lukk" class="hoved full">Lukk</button>
+  </dialog>
+
+  <div id="plasser" class="plasser" hidden>
+    <span id="plasser-tekst"></span>
+    <button id="plasser-avbryt">✕ Avbryt</button>
+  </div>
+
+  <!-- Seilturen til en ny øy -->
+  <div id="seiling" class="seiling" hidden>
+    <canvas id="seiling-lerret"></canvas>
+    <div id="seiling-tekst" class="seiling-tekst"></div>
+  </div>
+
+  <div id="melding" class="melding" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
