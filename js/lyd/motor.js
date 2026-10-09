@@ -157,8 +157,8 @@ export function stoyBuffer() {
 
 function frigi(noder) {
   aktive++;
-  const siste = noder[noder.length - 1];
-  siste.onended = () => { aktive--; for (const n of noder) { try { n.disconnect(); } catch { /* alt ok */ } } };
+  const kilde = noder[0];   // bare kildenoder (oscillator/buffer) sender «ended»
+  kilde.onended = () => { aktive--; for (const n of noder) { try { n.disconnect(); } catch { /* alt ok */ } } };
 }
 
 /**

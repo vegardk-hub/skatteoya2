@@ -18,3 +18,6 @@ Mange «ok» er vurdert ut fra kjent notebilde, ikke tone for tone mot partitur.
 
 ## Seiltur (2.0.3)
 Neon-rutenettet brukte shadowBlur på mange streker hver ramme (tungt på iPad). Erstattet med to streker (bred svak + skarp). Seilturen har egen lyd `L.seil()`.
+
+## Lydfeil rettet (2.0.6)
+Stemmeteller i motor.js lyttet på «ended» på en gain-node, som aldri sender den. Telleren bare økte, og etter 56 lyder ble alle nye lyder kuttet; bare hav, vind og fugler hørtes. Nå lytter den på kildenoden. Målt: lyd nr. 151 spilles fortsatt.
