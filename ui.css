@@ -275,13 +275,19 @@ body.liten .vare.null { letter-spacing: 0; padding-right: 10px; }
   .profil { width: 150px; }
   dialog.kort { padding: 18px 16px; border-width: 5px; }
   dialog h2 { font-size: 28px; }
-  .topp { gap: 8px; }
-  button.rund { width: 52px; height: 52px; }
+  .topp { gap: 6px; padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  button.rund { width: 50px; height: 50px; font-size: 26px; }
+  /* Smal himmel: dagtallet øverst til venstre og soltallet nederst til høyre, så de ikke overlapper */
+  #dag, #sol-tall { font-size: 15px; padding: 0 9px; line-height: 1.35; }
+  #dag { top: 3px; left: 5px; transform: none; }
+  #sol-tall { top: auto; bottom: 3px; right: 5px; transform: none; }
+  .knapper { flex-wrap: wrap-reverse; }
+  .knapper button { flex-basis: 100%; }
 }
 
 /* ================= Meldinger ================= */
 .melding {
-  bottom: calc(104px + env(safe-area-inset-bottom)); max-width: min(92vw, 620px); padding: 14px 24px; font-size: 21px; font-weight: 800; line-height: 1.3;
+  bottom: calc(104px + env(safe-area-inset-bottom)); width: max-content; max-width: min(92vw, 620px); padding: 14px 24px; font-size: 21px; font-weight: 800; line-height: 1.3;
   border: 5px solid var(--tre); border-radius: 22px;
   background: linear-gradient(180deg, var(--perg-lys), var(--perg-mork));
   box-shadow: inset 0 0 0 2px var(--messing), inset 0 3px 0 rgba(255, 255, 255, 0.8), 0 5px 0 var(--tre-mork), 0 16px 26px rgba(0, 0, 0, 0.45);
@@ -431,6 +437,8 @@ body.neon .selgrad button { background: #ff2bd6; color: #fff; border-color: #ff9
 @keyframes puls { 50% { transform: scale(1.04); } }
 .butikk-overskrift { font-size: 20px; font-weight: 900; color: var(--tittel); padding: 6px 4px 0; border-bottom: 3px solid var(--felt-kant); }
 body.neon .byggkort { color: #f6eaff; border-color: #6c3bd1; }
+body.neon .byggkort .bp { color: #3a2600; }
+body.neon .mynter-linje { background: linear-gradient(180deg, #2a1250, #1a0b36); border-color: #19e3ff; }
 body.neon .byggkort .bn { color: #ffd6f6; }
 body.neon .byggkort .bl { color: #bff4ff; background: rgba(25, 227, 255, 0.12); border-color: rgba(25, 227, 255, 0.4); }
 body.neon .byggkort.laast { background: repeating-linear-gradient(135deg, #1d0e3a 0 10px, #170a30 10px 20px); }
@@ -490,6 +498,18 @@ button.oyrad:active { background: linear-gradient(180deg, #fffbe0, #ffefa8); }
 .natt-tekst { font-size: 34px; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6); }
 .museum-knapp { min-height: 52px; font-size: 19px; }
 .seiling-tekst { font-size: 32px; }
+
+/* ================= Smal skjerm (mobil), etter alle grunnreglene ================= */
+@media (max-width: 560px) {
+  .butikk-innhold { max-height: min(54vh, max(160px, calc(92dvh - 480px))); }
+  .faner button { font-size: 18px; padding: 6px 4px; }
+  .byggliste { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; }
+  .tast { min-height: 54px; font-size: 26px; }
+  .tastatur { grid-template-columns: repeat(3, 76px); gap: 8px; }
+  .svarvalg { min-height: 70px; min-width: 84px; font-size: 34px; }
+  .matte { padding: 12px; }
+  .matte-stykke { font-size: 36px; }
+}
 
 /* ================= Tilgjengelighet: mindre bevegelse ================= */
 @media (prefers-reduced-motion: reduce) {
