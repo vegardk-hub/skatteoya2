@@ -39,6 +39,15 @@ export function kontekst() {
   return ac;
 }
 
+// Skjult side = stille: lydmotoren pauses når fanen/appen skjules og fortsetter når den vises igjen.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!ac || ac.startRendering) return;
+    if (document.hidden) ac.suspend?.().catch(() => {});
+    else ac.resume?.().catch(() => {});
+  });
+}
+
 export const buss = () => { kontekst(); return bus; };
 export const na = () => (ac ? ac.currentTime : 0);
 
